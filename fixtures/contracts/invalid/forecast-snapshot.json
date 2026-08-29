@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshotId": "bad",
+  "spotId": "55555555-5555-4555-8555-555555555555",
+  "generatedAt": "never",
+  "downloadedAt": "2026-08-29T08:00:00Z",
+  "validFrom": "2026-08-29T10:00:00Z",
+  "validTo": "2026-08-29T12:00:00Z",
+  "source": "x",
+  "sourceVersion": "1",
+  "timeBuckets": []
+}

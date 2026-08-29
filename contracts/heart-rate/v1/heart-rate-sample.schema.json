@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/heart-rate/v1/heart-rate-sample.schema.json",
+  "title": "HeartRateSample v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sequence",
+    "timestamp",
+    "bpm",
+    "source",
+    "quality"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "bpm": { "type": "integer", "minimum": 20, "maximum": 250 },
+    "source": {
+      "enum": ["optical_wrist", "external_chest_strap", "platform_fused"]
+    },
+    "quality": { "enum": ["unknown", "poor", "fair", "good"] }
+  }
+}

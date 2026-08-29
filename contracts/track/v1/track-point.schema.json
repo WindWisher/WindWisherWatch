@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/track/v1/track-point.schema.json",
+  "title": "TrackPoint v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sequence",
+    "timestamp",
+    "latitudeDegrees",
+    "longitudeDegrees",
+    "groundSpeedMps",
+    "source",
+    "qualityFlags"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "latitudeDegrees": { "type": "number", "minimum": -90, "maximum": 90 },
+    "longitudeDegrees": { "type": "number", "minimum": -180, "maximum": 180 },
+    "altitudeMeters": { "type": "number", "minimum": -500, "maximum": 10000 },
+    "groundSpeedMps": { "type": "number", "minimum": 0, "maximum": 80 },
+    "headingDegrees": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 360
+    },
+    "horizontalAccuracyMeters": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "verticalAccuracyMeters": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "source": { "enum": ["device_gps", "phone_gps", "fused_location"] },
+    "qualityFlags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://windwisher.app/contracts/common/v1/quality.schema.json#/$defs/qualityFlag"
+      }
+    }
+  }
+}

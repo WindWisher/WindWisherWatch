@@ -1,0 +1,24 @@
+{
+  "name": "windwisherwatch-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Portable contract validation and architectural guards for WindWisherWatch.",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "validate:contracts": "node tools/contracts/validate-contracts.mjs",
+    "test": "node --test tools/contracts/*.test.mjs",
+    "lint": "eslint tools/contracts --max-warnings=0",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run lint && npm test && npm run validate:contracts"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "eslint": "9.39.5",
+    "globals": "15.14.0",
+    "prettier": "3.4.2"
+  }
+}

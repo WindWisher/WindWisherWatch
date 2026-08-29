@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/jump/v1/jump-event.schema.json",
+  "title": "JumpEvent v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "jumpId",
+    "sessionId",
+    "sequence",
+    "takeoffAt",
+    "apexAt",
+    "landingAt",
+    "airtimeMilliseconds",
+    "confidence",
+    "algorithmVersion",
+    "qualityFlags"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "jumpId": { "type": "string", "format": "uuid" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "takeoffAt": { "type": "string", "format": "date-time" },
+    "apexAt": { "type": "string", "format": "date-time" },
+    "landingAt": { "type": "string", "format": "date-time" },
+    "heightMeters": { "type": "number", "minimum": 0, "maximum": 50 },
+    "airtimeMilliseconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 30000
+    },
+    "horizontalDistanceMeters": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 500
+    },
+    "takeoffSpeedMps": { "type": "number", "minimum": 0, "maximum": 80 },
+    "landingSpeedMps": { "type": "number", "minimum": 0, "maximum": 80 },
+    "takeoffPosition": {
+      "$ref": "https://windwisher.app/contracts/common/v1/quality.schema.json#/$defs/position"
+    },
+    "apexPosition": {
+      "$ref": "https://windwisher.app/contracts/common/v1/quality.schema.json#/$defs/position"
+    },
+    "landingPosition": {
+      "$ref": "https://windwisher.app/contracts/common/v1/quality.schema.json#/$defs/position"
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "algorithmVersion": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+    },
+    "qualityFlags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://windwisher.app/contracts/common/v1/quality.schema.json#/$defs/qualityFlag"
+      }
+    },
+    "sourceSensorSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "sampleCounts"],
+      "properties": {
+        "strategy": { "type": "string", "minLength": 3, "maxLength": 64 },
+        "sampleCounts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 },
+          "propertyNames": {
+            "enum": ["gps", "accelerometer", "gyroscope", "barometer"]
+          }
+        }
+      }
+    }
+  }
+}

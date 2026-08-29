@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "hasGps": true,
+  "hasAccelerometer": true,
+  "hasGyroscope": true,
+  "hasBarometer": false,
+  "hasHeartRate": true,
+  "supportedSamplingProfiles": ["sensor-lab-balanced-v1"],
+  "storage": {
+    "availableBytesAtStart": 8388608,
+    "maximumSingleFileBytes": 2097152
+  },
+  "runtime": {
+    "backgroundSessionSupported": true,
+    "maximumSessionDurationMilliseconds": 21600000
+  },
+  "screen": { "widthPixels": 280, "heightPixels": 280, "shape": "round" },
+  "inputCapabilities": ["buttons", "touch"]
+}

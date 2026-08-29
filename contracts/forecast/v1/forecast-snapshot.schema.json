@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/forecast/v1/forecast-snapshot.schema.json",
+  "title": "ForecastSnapshot v1",
+  "description": "Cached prediction; never live wind measured by the wearable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "snapshotId",
+    "spotId",
+    "generatedAt",
+    "downloadedAt",
+    "validFrom",
+    "validTo",
+    "source",
+    "sourceVersion",
+    "timeBuckets"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "snapshotId": { "type": "string", "format": "uuid" },
+    "spotId": { "type": "string", "format": "uuid" },
+    "spotName": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "downloadedAt": { "type": "string", "format": "date-time" },
+    "validFrom": { "type": "string", "format": "date-time" },
+    "validTo": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "sourceVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "timeBuckets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 336,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "validFrom",
+          "validTo",
+          "forecastWindSpeedMps",
+          "forecastGustSpeedMps",
+          "windDirectionDegrees",
+          "warnings"
+        ],
+        "properties": {
+          "validFrom": { "type": "string", "format": "date-time" },
+          "validTo": { "type": "string", "format": "date-time" },
+          "forecastWindSpeedMps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "forecastGustSpeedMps": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120
+          },
+          "windDirectionDegrees": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMaximum": 360
+          },
+          "warnings": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/sync/v1/sync-package.schema.json",
+  "title": "SyncPackage v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "syncProtocolVersion",
+    "payloadVersion",
+    "syncPackageId",
+    "sessionId",
+    "deviceId",
+    "createdAt",
+    "sequence",
+    "checksum",
+    "checksumAlgorithm",
+    "idempotencyKey",
+    "sourcePlatform",
+    "compression",
+    "encryption",
+    "contentManifest"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "syncProtocolVersion": { "const": "1.0.0" },
+    "payloadVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "syncPackageId": { "type": "string", "format": "uuid" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "deviceId": { "type": "string", "format": "uuid" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "totalSequences": { "type": "integer", "minimum": 1 },
+    "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "checksumAlgorithm": { "const": "sha256" },
+    "idempotencyKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{16,128}$"
+    },
+    "sourcePlatform": { "enum": ["garmin", "watchos", "wearos"] },
+    "compression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm"],
+      "properties": {
+        "algorithm": { "enum": ["none", "gzip", "zstd"] },
+        "uncompressedBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 52428800
+        }
+      }
+    },
+    "encryption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transportSecurity"],
+      "properties": {
+        "transportSecurity": { "const": "tls" },
+        "contentEncryption": { "enum": ["none", "platform_managed"] }
+      }
+    },
+    "contentManifest": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contentType", "schemaVersion", "itemCount", "byteLength"],
+        "properties": {
+          "contentType": {
+            "enum": [
+              "session_summary",
+              "jumps",
+              "track",
+              "heart_rate",
+              "device_metadata",
+              "forecast_snapshot",
+              "diagnostics"
+            ]
+          },
+          "schemaVersion": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          },
+          "itemCount": { "type": "integer", "minimum": 0 },
+          "byteLength": { "type": "integer", "minimum": 0, "maximum": 52428800 }
+        }
+      }
+    }
+  }
+}

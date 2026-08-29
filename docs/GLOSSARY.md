@@ -1,0 +1,25 @@
+# Glossary
+
+- **Session:** One bounded kitesurf recording with stable identity, lifecycle, summaries, provenance, and sync metadata.
+- **Jump:** A validated airborne event associated with one session; not every candidate becomes a jump.
+- **Takeoff:** Estimated transition from water-supported riding to flight.
+- **Apex:** Estimated maximum vertical point within flight.
+- **Landing:** Estimated transition from flight back to water contact/riding.
+- **Airtime:** Derived elapsed milliseconds between estimated takeoff and landing.
+- **Jump Height:** Derived vertical displacement estimate in meters under a named algorithm; not direct ground truth.
+- **Jump Distance:** Derived horizontal displacement estimate in meters between defined event positions.
+- **Track:** Time-ordered location/motion observations for a session.
+- **TrackPoint:** One timestamped geospatial observation with explicit units, source, accuracy, and quality.
+- **Sensor Sample:** Timestamped observation from a platform sensor before domain derivation.
+- **Forecast Snapshot:** Cached prediction for a spot and validity interval; never live measured watch wind.
+- **Measured Metric:** Value directly reported by a sensor after unit conversion and validation.
+- **Derived Metric:** Value calculated from observations or other metrics under a named algorithm.
+- **Confidence:** Unitless `[0,1]` assessment of support for a derived result, not probability unless an algorithm specification proves calibration.
+- **Quality Flag:** Machine-readable condition affecting interpretation, such as GPS degradation or clock discontinuity.
+- **Sync Package:** Versioned, checksummed, idempotent transfer envelope containing a bounded session subset.
+- **Device Capability:** Explicit sensor/runtime/storage fact about the recording device and current profile.
+- **Session Summary:** Compact aggregates and lifecycle metadata; not raw telemetry.
+- **Raw Telemetry:** Highest-fidelity retained sensor observations, subject to platform limits and privacy policy.
+- **Validation Reference:** Comparison measurement such as Woo or controlled apparatus; a reference with uncertainty, not automatic truth.
+- **Schema Version:** Semantic version of a persisted contract shape.
+- **Algorithm Version:** Immutable identity of computation and relevant configuration producing a derived result.

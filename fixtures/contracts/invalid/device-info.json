@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "2.0.0",
+  "deviceId": "bad",
+  "manufacturer": "",
+  "model": "X",
+  "platform": "flutter",
+  "platformVersion": "1",
+  "appVersion": "latest",
+  "capabilities": {}
+}

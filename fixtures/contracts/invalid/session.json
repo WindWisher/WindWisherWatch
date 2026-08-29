@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "sessionId": "not-a-uuid",
+  "deviceId": "22222222-2222-4222-8222-222222222222",
+  "devicePlatform": "garmin",
+  "startedAt": "yesterday",
+  "endedAt": "2026-08-29T11:12:30Z",
+  "durationMilliseconds": -1,
+  "recordingState": "finished",
+  "syncStatus": "pending",
+  "sport": "kitesurf",
+  "visibility": "private",
+  "trackSummary": { "pointsCount": 0, "distanceMeters": 0 },
+  "speedSummary": { "maximumSpeedMps": 0, "averageMovingSpeedMps": 0 },
+  "heartRateSummary": { "samplesCount": 0 },
+  "jumpSummary": { "jumpsCount": 0 },
+  "sensorQualitySummary": {
+    "qualityFlags": [],
+    "degradedDurationMilliseconds": 0
+  },
+  "algorithmMetadata": {
+    "algorithmVersion": "jump-engine-height-v1",
+    "confidence": 2,
+    "qualityFlags": []
+  }
+}

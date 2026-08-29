@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshotId": "44444444-4444-4444-8444-444444444444",
+  "spotId": "55555555-5555-4555-8555-555555555555",
+  "spotName": "Synthetic Test Bay",
+  "generatedAt": "2026-08-29T06:00:00Z",
+  "downloadedAt": "2026-08-29T08:00:00Z",
+  "validFrom": "2026-08-29T10:00:00Z",
+  "validTo": "2026-08-29T12:00:00Z",
+  "source": "synthetic-forecast",
+  "sourceVersion": "2026.08",
+  "timeBuckets": [
+    {
+      "validFrom": "2026-08-29T10:00:00Z",
+      "validTo": "2026-08-29T11:00:00Z",
+      "forecastWindSpeedMps": 8.2,
+      "forecastGustSpeedMps": 11.4,
+      "windDirectionDegrees": 245,
+      "warnings": []
+    }
+  ]
+}

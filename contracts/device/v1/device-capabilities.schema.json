@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/device/v1/device-capabilities.schema.json",
+  "title": "DeviceCapabilities v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "hasGps",
+    "hasAccelerometer",
+    "hasGyroscope",
+    "hasBarometer",
+    "hasHeartRate",
+    "supportedSamplingProfiles",
+    "storage",
+    "runtime",
+    "screen",
+    "inputCapabilities"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "hasGps": { "type": "boolean" },
+    "hasAccelerometer": { "type": "boolean" },
+    "hasGyroscope": { "type": "boolean" },
+    "hasBarometer": { "type": "boolean" },
+    "hasHeartRate": { "type": "boolean" },
+    "supportedSamplingProfiles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["availableBytesAtStart"],
+      "properties": {
+        "availableBytesAtStart": { "type": "integer", "minimum": 0 },
+        "maximumSingleFileBytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backgroundSessionSupported"],
+      "properties": {
+        "backgroundSessionSupported": { "type": "boolean" },
+        "maximumSessionDurationMilliseconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "screen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["widthPixels", "heightPixels", "shape"],
+      "properties": {
+        "widthPixels": { "type": "integer", "minimum": 1 },
+        "heightPixels": { "type": "integer", "minimum": 1 },
+        "shape": { "enum": ["round", "rectangular", "other"] }
+      }
+    },
+    "inputCapabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["touch", "buttons", "crown", "bezel", "voice"] }
+    }
+  }
+}

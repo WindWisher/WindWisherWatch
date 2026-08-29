@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/device/v1/device-info.schema.json",
+  "title": "DeviceInfo v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "deviceId",
+    "manufacturer",
+    "model",
+    "platform",
+    "platformVersion",
+    "appVersion",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "deviceId": { "type": "string", "format": "uuid" },
+    "manufacturer": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "model": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "platform": { "enum": ["garmin", "watchos", "wearos"] },
+    "platformVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "appVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "firmwareVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "capabilities": {
+      "$ref": "https://windwisher.app/contracts/device/v1/device-capabilities.schema.json"
+    }
+  }
+}

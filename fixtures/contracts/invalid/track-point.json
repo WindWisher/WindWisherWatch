@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "sequence": -2,
+  "timestamp": "bad-time",
+  "latitudeDegrees": 136,
+  "longitudeDegrees": -5.6,
+  "groundSpeedMps": -1,
+  "source": "satellite",
+  "qualityFlags": []
+}

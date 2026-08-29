@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/session/v1/session.schema.json",
+  "title": "Session v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sessionId",
+    "deviceId",
+    "devicePlatform",
+    "startedAt",
+    "endedAt",
+    "durationMilliseconds",
+    "recordingState",
+    "syncStatus",
+    "sport",
+    "visibility",
+    "trackSummary",
+    "speedSummary",
+    "heartRateSummary",
+    "jumpSummary",
+    "sensorQualitySummary",
+    "algorithmMetadata"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "userId": { "type": "string", "format": "uuid" },
+    "deviceId": { "type": "string", "format": "uuid" },
+    "devicePlatform": { "enum": ["garmin", "watchos", "wearos"] },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": "string", "format": "date-time" },
+    "durationMilliseconds": { "type": "integer", "minimum": 0 },
+    "recordingState": {
+      "enum": [
+        "prepared",
+        "recording",
+        "paused",
+        "stopping",
+        "completed",
+        "recovered",
+        "corrupted"
+      ]
+    },
+    "syncStatus": {
+      "enum": ["not_ready", "pending", "syncing", "synced", "failed"]
+    },
+    "sport": { "const": "kitesurf" },
+    "spotId": { "type": "string", "format": "uuid" },
+    "visibility": {
+      "enum": ["private", "followers", "public"],
+      "default": "private"
+    },
+    "trackSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pointsCount", "distanceMeters"],
+      "properties": {
+        "pointsCount": { "type": "integer", "minimum": 0 },
+        "distanceMeters": { "type": "number", "minimum": 0 },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "endedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "speedSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumSpeedMps", "averageMovingSpeedMps"],
+      "properties": {
+        "maximumSpeedMps": { "type": "number", "minimum": 0, "maximum": 80 },
+        "averageMovingSpeedMps": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 80
+        }
+      }
+    },
+    "heartRateSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["samplesCount"],
+      "properties": {
+        "samplesCount": { "type": "integer", "minimum": 0 },
+        "averageBpm": { "type": "integer", "minimum": 20, "maximum": 250 },
+        "maximumBpm": { "type": "integer", "minimum": 20, "maximum": 250 }
+      }
+    },
+    "jumpSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jumpsCount"],
+      "properties": {
+        "jumpsCount": { "type": "integer", "minimum": 0 },
+        "highestJumpMeters": { "type": "number", "minimum": 0, "maximum": 50 },
+        "longestJumpDistanceMeters": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "longestAirtimeMilliseconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000
+        }
+      }
+    },
+    "sensorQualitySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qualityFlags", "degradedDurationMilliseconds"],
+      "properties": {
+        "qualityFlags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "https://windwisher.app/contracts/common/v1/quality.schema.json#/$defs/qualityFlag"
+          }
+        },
+        "degradedDurationMilliseconds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "algorithmMetadata": {
+      "$ref": "https://windwisher.app/contracts/common/v1/quality.schema.json#/$defs/algorithmMetadata"
+    }
+  }
+}

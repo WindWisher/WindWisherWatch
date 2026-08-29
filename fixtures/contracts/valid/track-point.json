@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "sequence": 1412,
+  "timestamp": "2026-08-29T10:23:32.125Z",
+  "latitudeDegrees": 36.0123,
+  "longitudeDegrees": -5.6123,
+  "altitudeMeters": 3.4,
+  "groundSpeedMps": 10.6,
+  "headingDegrees": 247.2,
+  "horizontalAccuracyMeters": 4.2,
+  "verticalAccuracyMeters": 7.5,
+  "source": "device_gps",
+  "qualityFlags": []
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "deviceId": "22222222-2222-4222-8222-222222222222",
+  "manufacturer": "Synthetic Devices Ltd.",
+  "model": "Research Watch A",
+  "platform": "garmin",
+  "platformVersion": "research-1",
+  "appVersion": "0.0.0-m0",
+  "firmwareVersion": "synthetic-1",
+  "capabilities": {
+    "schemaVersion": "1.0.0",
+    "hasGps": true,
+    "hasAccelerometer": true,
+    "hasGyroscope": true,
+    "hasBarometer": false,
+    "hasHeartRate": true,
+    "supportedSamplingProfiles": ["sensor-lab-balanced-v1"],
+    "storage": { "availableBytesAtStart": 8388608 },
+    "runtime": { "backgroundSessionSupported": true },
+    "screen": { "widthPixels": 280, "heightPixels": 280, "shape": "round" },
+    "inputCapabilities": ["buttons"]
+  }
+}
