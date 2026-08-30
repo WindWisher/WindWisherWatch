@@ -1,0 +1,32 @@
+{
+  "canonicalSchemaVersion": "1.0.0",
+  "recordSequence": 0,
+  "recordType": "manifest",
+  "payload": {
+    "sessionId": "synthetic-session-0001",
+    "producer": {
+      "platform": "host_reference",
+      "producerVersion": "0.1.0-m4",
+      "journalFormatVersion": 1,
+      "metricProjectionVersion": "1.0.0"
+    },
+    "device": { "platform": "host_reference", "manufacturer": "Synthetic" },
+    "lifecycle": { "completionStatus": "COMPLETED" },
+    "timing": {
+      "startedAt": "2024-01-01T00:00:00.000Z",
+      "endedAt": "2024-01-01T00:01:00.000Z",
+      "elapsedDurationMilliseconds": 60000
+    },
+    "sections": ["track", "quality", "operational_summary", "completion"],
+    "privacy": {
+      "visibility": "private",
+      "classifications": [
+        "PUBLIC_METADATA",
+        "OPERATIONAL",
+        "SENSITIVE_LOCATION"
+      ]
+    }
+  },
+  "checksumAlgorithm": "crc32",
+  "checksum": "1234abcd"
+}

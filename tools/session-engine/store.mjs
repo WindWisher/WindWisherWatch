@@ -94,6 +94,29 @@ export class MemorySessionStore {
     );
   }
 
+  *iterateChunks(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error("Session does not exist");
+    for (const chunk of session.chunks) yield Buffer.from(chunk);
+  }
+
+  exportDescriptor(sessionId) {
+    const session = this.sessions.get(sessionId);
+    const entry = this.index.get(sessionId);
+    if (!session || !entry || !session.startFrame)
+      throw new Error("Session does not exist or has no start frame");
+    const tail = this.validateTail(sessionId, entry.lastSequence);
+    if (tail.integrity !== "VALID")
+      throw new Error("Only a completed valid session can be exported");
+    return {
+      metadata: structuredClone(session.metadata),
+      index: structuredClone(entry),
+      startFrame: structuredClone(session.startFrame),
+      finalFrame: structuredClone(tail.frames.at(-1)),
+      chunks: () => this.iterateChunks(sessionId),
+    };
+  }
+
   discoverRecoverable() {
     return [...this.sessions.keys()].filter((sessionId) => {
       const entry = this.index.get(sessionId);

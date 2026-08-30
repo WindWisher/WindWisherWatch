@@ -1,0 +1,18 @@
+{
+  "canonicalSchemaVersion": "1.0.0",
+  "recordSequence": -1,
+  "recordType": "track",
+  "payload": {
+    "journalSequence": 1,
+    "relativeMilliseconds": 1000,
+    "latitudeDegrees": 91,
+    "longitudeDegrees": 0,
+    "groundSpeedMps": -1,
+    "fixQuality": "GOOD",
+    "usable": true,
+    "source": "device_gps",
+    "timestampProvenance": "SESSION_MONOTONIC"
+  },
+  "checksumAlgorithm": "crc32",
+  "checksum": "not-valid"
+}

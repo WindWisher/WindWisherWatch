@@ -24,7 +24,17 @@ const required = [
   "scripts/test.sh",
 ];
 
+const canonicalExportRequired = [
+  "canonical-export/exporter.mjs",
+  "canonical-export/parser.mjs",
+  "canonical-export/format.mjs",
+  "canonical-export/validator.mjs",
+  "canonical-export/inspect.mjs",
+];
+
 for (const relative of required) await fs.access(path.join(project, relative));
+for (const relative of canonicalExportRequired)
+  await fs.access(path.join(root, "tools/session-engine", relative));
 
 const sourceNames = (await fs.readdir(path.join(project, "source"))).filter(
   (name) => name.endsWith(".mc"),
@@ -101,6 +111,8 @@ const stopBody = engineSource.substring(
 );
 if (stopBody.includes("for (") || stopBody.includes("frames("))
   throw new Error("M3 stop complexity must remain bounded");
+if (/Canonical|Export|export/i.test(stopBody))
+  throw new Error("M4 export must remain outside the Garmin stop path");
 if (
   !source.includes("CoreMetricProjector") ||
   !source.includes("distanceMeters")
@@ -112,6 +124,36 @@ if (
 )
   throw new Error("M3 Garmin recovery lacks a direct checkpoint pointer");
 
+const hostEngine = await fs.readFile(
+  path.join(root, "tools/session-engine/engine.mjs"),
+  "utf8",
+);
+for (const marker of ["stop()", "recover(sessionId)"]) {
+  const start = hostEngine.indexOf(marker);
+  const body = hostEngine.slice(start, hostEngine.indexOf("\n  }", start) + 4);
+  if (/CanonicalSessionExporter|canonical-export/.test(body))
+    throw new Error(`M4 export leaked into host ${marker}`);
+}
+
+const canonicalSource = (
+  await Promise.all(
+    canonicalExportRequired.map((relative) =>
+      fs.readFile(path.join(root, "tools/session-engine", relative), "utf8"),
+    ),
+  )
+).join("\n");
+for (const forbidden of [
+  "Supabase",
+  "fetch(",
+  "makeWebRequest",
+  "JumpEngine",
+  "jumpHeight",
+  "airtime",
+  "process.env",
+])
+  if (canonicalSource.includes(forbidden))
+    throw new Error(`M4 exporter contains out-of-scope symbol: ${forbidden}`);
+
 console.log(
-  `Session Engine source guards passed: ${required.length} artifacts; M3 bounds, stop complexity, permissions and scope verified.`,
+  `Session Engine source guards passed: ${required.length + canonicalExportRequired.length} artifacts; M3 bounds and M4 export isolation, permissions and scope verified.`,
 );

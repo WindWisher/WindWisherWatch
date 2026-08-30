@@ -1,0 +1,29 @@
+{
+  "fixtureKind": "synthetic-scenario-catalog",
+  "canonicalSchemaVersion": "1.0.0",
+  "privacy": "contains no real user data",
+  "scenarios": [
+    { "id": "minimal", "expected": "VALID", "sections": ["track"] },
+    {
+      "id": "full",
+      "expected": "VALID",
+      "sections": ["track", "heart_rate", "pressure", "quality"]
+    },
+    {
+      "id": "recovered",
+      "expected": "VALID",
+      "completionStatus": "RECOVERED_THEN_COMPLETED"
+    },
+    { "id": "without-heart-rate", "expected": "VALID", "sections": ["track"] },
+    {
+      "id": "without-pressure",
+      "expected": "VALID",
+      "sections": ["track", "heart_rate"]
+    },
+    { "id": "degraded-quality", "expected": "VALID", "quality": "DEGRADED" },
+    { "id": "truncated", "expected": "REJECTED" },
+    { "id": "bad-checksum", "expected": "REJECTED" },
+    { "id": "unsupported-version", "expected": "REJECTED" },
+    { "id": "long-four-hour", "expected": "VALID", "virtualDurationHours": 4 }
+  ]
+}

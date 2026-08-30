@@ -11,6 +11,10 @@ const root = path.resolve(
 
 const fixtureToSchema = new Map([
   [
+    "canonical-session-record",
+    "https://windwisher.app/contracts/session/v1/canonical-session-record.schema.json",
+  ],
+  [
     "session",
     "https://windwisher.app/contracts/session/v1/session.schema.json",
   ],

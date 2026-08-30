@@ -4,13 +4,13 @@ WindWisherWatch is the pre-alpha wearable instrument for recording offline kites
 
 ## Status
 
-**M3 — Core Session Metrics complete.** Incremental time, current/max speed, distance, HR and GPS freshness use constant-size recoverable state. Movement, normal finalization, legacy-checkpoint recovery and direct-checkpoint recovery are verified on representative Garmin hardware. The Jump Engine is deferred.
+**M4 — Canonical Session Dataset & Export Foundation complete.** Completed valid journals can be transformed incrementally into a versioned, checksummed, private canonical NDJSON stream and validated or safely inspected on the host. No networking, backend schema, sync, Jump Engine or Garmin runtime export was added.
 
 ## Architecture at a glance
 
 Each platform owns its sensor adapters, durable local storage implementation, UI, and sync adapter. Platforms share semantics through JSON Schema contracts, specifications, fixtures, test vectors, and ADRs—not a mandatory UI or runtime. Recording is offline-first and sensor-first. The future Jump Engine is isolated from platform UI and emits traceable results with algorithm version, confidence, and quality flags.
 
-Data flows from the wearable's local session journal through an idempotent `SyncPackage` to the existing WindWisher backend and then to the WindWisher Flutter app. Contracts contain no Supabase SDK concepts.
+The intended future flow is wearable journal → canonical session dataset → sync adapter → existing WindWisher backend → WindWisher Flutter app. M4 implements only the first transformation. Contracts contain no Supabase SDK concepts.
 
 ## Repository map
 
@@ -40,7 +40,7 @@ WindWisherWatch records and owns the durable on-device copy until acknowledged s
 
 ## Roadmap
 
-M0, M1 hardware characterization, M2 and **M3 — Core Session Metrics** are complete. M3 remains separate from future Jump Engine research and product analytics. See [the detailed roadmap](docs/ROADMAP.md).
+M0, M1 hardware characterization, M2, M3 and **M4 — Canonical Session Dataset & Export Foundation** are complete. M4 remains separate from future Jump Engine research, networking and product analytics. See [the detailed roadmap](docs/ROADMAP.md).
 
 ## Development
 

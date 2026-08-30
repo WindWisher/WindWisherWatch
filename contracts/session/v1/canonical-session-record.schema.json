@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://windwisher.app/contracts/session/v1/canonical-session-record.schema.json",
+  "title": "Canonical Session Stream Record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "canonicalSchemaVersion",
+    "recordSequence",
+    "recordType",
+    "payload",
+    "checksumAlgorithm",
+    "checksum"
+  ],
+  "properties": {
+    "canonicalSchemaVersion": { "const": "1.0.0" },
+    "recordSequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "recordType": {
+      "enum": [
+        "manifest",
+        "track",
+        "heart_rate",
+        "pressure",
+        "quality",
+        "operational_summary",
+        "completion"
+      ]
+    },
+    "payload": { "type": "object" },
+    "checksumAlgorithm": { "const": "crc32" },
+    "checksum": { "type": "string", "pattern": "^[a-f0-9]{8}$" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "recordType": { "const": "manifest" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/manifest" } } }
+    },
+    {
+      "if": { "properties": { "recordType": { "const": "track" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/track" } } }
+    },
+    {
+      "if": { "properties": { "recordType": { "const": "heart_rate" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/heartRate" } } }
+    },
+    {
+      "if": { "properties": { "recordType": { "const": "pressure" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/pressure" } } }
+    },
+    {
+      "if": { "properties": { "recordType": { "const": "quality" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/quality" } } }
+    },
+    {
+      "if": {
+        "properties": { "recordType": { "const": "operational_summary" } }
+      },
+      "then": {
+        "properties": { "payload": { "$ref": "#/$defs/operationalSummary" } }
+      }
+    },
+    {
+      "if": { "properties": { "recordType": { "const": "completion" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/completion" } } }
+    }
+  ],
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["track", "heartRate", "pressure", "quality"],
+      "properties": {
+        "track": { "type": "integer", "minimum": 0, "maximum": 10000000 },
+        "heartRate": { "type": "integer", "minimum": 0, "maximum": 10000000 },
+        "pressure": { "type": "integer", "minimum": 0, "maximum": 10000000 },
+        "quality": { "type": "integer", "minimum": 0, "maximum": 100000 }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionId",
+        "producer",
+        "device",
+        "lifecycle",
+        "timing",
+        "sections",
+        "privacy"
+      ],
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+        },
+        "producer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "platform",
+            "producerVersion",
+            "journalFormatVersion",
+            "metricProjectionVersion"
+          ],
+          "properties": {
+            "platform": {
+              "enum": ["garmin", "watchos", "wearos", "host_reference"]
+            },
+            "producerVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "journalFormatVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 255
+            },
+            "metricProjectionVersion": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            }
+          }
+        },
+        "device": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform"],
+          "properties": {
+            "platform": {
+              "enum": ["garmin", "watchos", "wearos", "host_reference"]
+            },
+            "manufacturer": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "model": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "firmwareVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          }
+        },
+        "lifecycle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["completionStatus"],
+          "properties": {
+            "completionStatus": {
+              "enum": ["COMPLETED", "RECOVERED_THEN_COMPLETED"]
+            }
+          }
+        },
+        "timing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["startedAt", "endedAt", "elapsedDurationMilliseconds"],
+          "properties": {
+            "startedAt": { "type": "string", "format": "date-time" },
+            "endedAt": { "type": "string", "format": "date-time" },
+            "elapsedDurationMilliseconds": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "sections": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "track",
+              "heart_rate",
+              "pressure",
+              "quality",
+              "operational_summary",
+              "completion"
+            ]
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["visibility", "classifications"],
+          "properties": {
+            "visibility": { "const": "private" },
+            "classifications": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "PUBLIC_METADATA",
+                  "OPERATIONAL",
+                  "SENSITIVE_LOCATION",
+                  "SENSITIVE_HEALTH"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journalSequence",
+        "relativeMilliseconds",
+        "latitudeDegrees",
+        "longitudeDegrees",
+        "groundSpeedMps",
+        "fixQuality",
+        "usable",
+        "source",
+        "timestampProvenance"
+      ],
+      "properties": {
+        "journalSequence": { "type": "integer", "minimum": 0 },
+        "relativeMilliseconds": { "type": "integer", "minimum": 0 },
+        "latitudeDegrees": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitudeDegrees": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "altitudeMeters": {
+          "type": "number",
+          "minimum": -500,
+          "maximum": 10000
+        },
+        "groundSpeedMps": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 80
+        },
+        "headingDegrees": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "horizontalAccuracyMeters": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "fixQuality": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "integer" }]
+        },
+        "usable": { "type": "boolean" },
+        "source": { "const": "device_gps" },
+        "timestampProvenance": {
+          "enum": ["SOURCE_RAW", "CALLBACK_FALLBACK", "SESSION_MONOTONIC"]
+        }
+      }
+    },
+    "heartRate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journalSequence",
+        "relativeMilliseconds",
+        "bpm",
+        "source",
+        "quality"
+      ],
+      "properties": {
+        "journalSequence": { "type": "integer", "minimum": 0 },
+        "relativeMilliseconds": { "type": "integer", "minimum": 0 },
+        "bpm": { "type": "integer", "minimum": 20, "maximum": 250 },
+        "source": {
+          "enum": ["optical_wrist", "external_chest_strap", "platform_fused"]
+        },
+        "quality": { "enum": ["unknown", "poor", "fair", "good"] }
+      }
+    },
+    "pressure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journalSequence",
+        "relativeMilliseconds",
+        "pressurePascals",
+        "source"
+      ],
+      "properties": {
+        "journalSequence": { "type": "integer", "minimum": 0 },
+        "relativeMilliseconds": { "type": "integer", "minimum": 0 },
+        "pressurePascals": {
+          "type": "number",
+          "minimum": 10000,
+          "maximum": 120000
+        },
+        "source": { "const": "platform_sensor" }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["counters", "notableEvents"],
+      "properties": {
+        "counters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]{2,63}$" }
+        },
+        "notableEvents": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "relativeMilliseconds"],
+            "properties": {
+              "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$" },
+              "relativeMilliseconds": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "operationalSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectionKind",
+        "elapsedDurationMilliseconds",
+        "distanceMeters",
+        "maximumSpeedMps",
+        "sampleCounts",
+        "qualityCounters"
+      ],
+      "properties": {
+        "projectionKind": { "const": "WATCH_OPERATIONAL_PROJECTION" },
+        "elapsedDurationMilliseconds": { "type": "integer", "minimum": 0 },
+        "distanceMeters": { "type": "number", "minimum": 0 },
+        "maximumSpeedMps": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 80
+        },
+        "sampleCounts": { "$ref": "#/$defs/counts" },
+        "qualityCounters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]{2,63}$" }
+        }
+      }
+    },
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completionStatus",
+        "sourceJournalIntegrity",
+        "recordCounts",
+        "streamChecksumAlgorithm",
+        "streamChecksum"
+      ],
+      "properties": {
+        "completionStatus": {
+          "enum": ["COMPLETED", "RECOVERED_THEN_COMPLETED"]
+        },
+        "sourceJournalIntegrity": { "const": "VALID" },
+        "recordCounts": { "$ref": "#/$defs/counts" },
+        "streamChecksumAlgorithm": { "const": "crc32" },
+        "streamChecksum": { "type": "string", "pattern": "^[a-f0-9]{8}$" }
+      }
+    }
+  }
+}
