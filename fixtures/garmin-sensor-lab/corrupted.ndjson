@@ -1,0 +1,4 @@
+{"recordType":"manifest","labSchemaVersion":"1.0.0","experimentId":"synthetic-corrupt-001","appVersion":"0.1.0-m1","sdkVersion":"synthetic","ciqApiLevel":"synthetic","profile":"LOW","environment":{"kind":"SYNTHETIC_FIXTURE","protocol":"T2"},"startedAt":"2026-08-29T12:00:00Z","device":{"model":"Synthetic Garmin","firmware":"synthetic"},"requestedRatesHz":{"accelerometer":10}}
+{"recordType":"sample","sensor":"accelerometer","sequence":0,"monotonicMilliseconds":1000,"raw":{"x":0,"y":0,"z":1000}}
+this is not json
+{"recordType":"completion","endedAt":"2026-08-29T12:00:01Z","monotonicMilliseconds":2000,"result":"COMPLETED","warnings":["CORRUPTED_FIXTURE"]}

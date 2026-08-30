@@ -1,0 +1,17 @@
+{
+  "scenario": "normal_session",
+  "synthetic": true,
+  "events": [
+    { "type": "start", "atMilliseconds": 0 },
+    {
+      "type": "position",
+      "atMilliseconds": 1000,
+      "latitudeDegrees": 0.001,
+      "longitudeDegrees": 0.001,
+      "groundSpeedMps": 4
+    },
+    { "type": "heart_rate", "atMilliseconds": 1000, "bpm": 120 },
+    { "type": "stop", "atMilliseconds": 2000 }
+  ],
+  "expectedIntegrity": "VALID"
+}

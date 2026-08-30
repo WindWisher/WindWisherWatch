@@ -1,0 +1,26 @@
+{
+  "synthetic": true,
+  "scenarios": [
+    { "name": "missing_final", "expectedIntegrity": "RECOVERABLE" },
+    {
+      "name": "partial_tail",
+      "expectedIntegrity": "RECOVERABLE",
+      "expectedIssue": "TAIL_INCOMPLETE"
+    },
+    {
+      "name": "bad_checksum",
+      "expectedIntegrity": "RECOVERABLE",
+      "expectedIssue": "CHECKSUM_FAILED"
+    },
+    {
+      "name": "duplicate_sequence",
+      "expectedIntegrity": "RECOVERABLE",
+      "expectedIssue": "DUPLICATE_OR_OUT_OF_ORDER_SEQUENCE"
+    },
+    { "name": "stale_index", "journalIsSourceOfTruth": true },
+    {
+      "name": "unsupported_version",
+      "expectedIntegrity": "UNSUPPORTED_VERSION"
+    }
+  ]
+}

@@ -9,10 +9,14 @@
   },
   "scripts": {
     "validate:contracts": "node tools/contracts/validate-contracts.mjs",
-    "test": "node --test tools/contracts/*.test.mjs",
-    "lint": "eslint tools/contracts --max-warnings=0",
+    "validate:garmin-lab": "node tools/garmin-sensor-lab/validate-fixtures.mjs",
+    "validate:session-engine": "node --test tools/session-engine/*.test.mjs",
+    "guard:garmin-source": "node tools/garmin-sensor-lab/source-guards.mjs",
+    "guard:session-engine": "node tools/session-engine/source-guards.mjs",
+    "test": "node --test tools/contracts/*.test.mjs tools/garmin-sensor-lab/*.test.mjs tools/session-engine/*.test.mjs",
+    "lint": "eslint tools --max-warnings=0",
     "format:check": "prettier --check .",
-    "check": "npm run format:check && npm run lint && npm test && npm run validate:contracts"
+    "check": "npm run format:check && npm run lint && npm test && npm run validate:contracts && npm run validate:garmin-lab && npm run validate:session-engine && npm run guard:garmin-source && npm run guard:session-engine"
   },
   "devDependencies": {
     "ajv": "8.20.0",

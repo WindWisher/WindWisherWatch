@@ -2,6 +2,14 @@ node_modules/
 coverage/
 .DS_Store
 *.log
+*.key
+*.der
+*.pem
+*.prg
+platforms/garmin/bin/
+platforms/garmin/**/bin/
+research/garmin/results/*
+!research/garmin/results/README.md
 .env
 .env.*
 !.env.example

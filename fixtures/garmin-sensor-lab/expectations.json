@@ -1,0 +1,9 @@
+{
+  "valid-capture.ndjson": [],
+  "gap.ndjson": [],
+  "duplicate.ndjson": [],
+  "out-of-order.ndjson": [],
+  "corrupted.ndjson": ["CORRUPTED_JSON"],
+  "partial-record.ndjson": ["MISSING_COMPLETION", "PARTIAL_RECORD"],
+  "missing-timestamp.ndjson": ["MISSING_TIMESTAMP"]
+}

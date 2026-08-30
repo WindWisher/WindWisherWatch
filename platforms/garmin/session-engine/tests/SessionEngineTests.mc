@@ -1,0 +1,86 @@
+class SeTestClock {
+    var monotonic = 1000;
+    var epoch = 1700000000;
+    function monotonicMilliseconds() { return monotonic; }
+    function epochSeconds() { return epoch; }
+    function elapsed(startValue, endValue) {
+        if (endValue >= startValue) { return endValue - startValue; }
+        return (4294967296l - startValue) + endValue;
+    }
+}
+
+class SeTestStore {
+    var records = [];
+    var sessionId = null;
+    var state = null;
+    var failAppend = false;
+
+    function create(id, startedAt) { sessionId = id; state = SeConstants.STATE_PREPARING; return true; }
+    function append(id, frame) { if (failAppend) { return false; } records.add(frame); return true; }
+    function updateState(id, nextState) { state = nextState; return true; }
+    function validate(id) {
+        var hasFinal = records.size() > 0 && records[records.size() - 1]["frameType"].equals(SeConstants.FRAME_SESSION_FINAL);
+        return { "integrity" => hasFinal ? "VALID" : "RECOVERABLE", "lastSequence" => records.size() - 1, "hasFinal" => hasFinal };
+    }
+    function discoverRecoverable() { return sessionId != null && !validate(sessionId)["hasFinal"] ? [sessionId] : []; }
+    function latestCheckpoint(id) {
+        for (var index = records.size() - 1; index >= 0; index -= 1) {
+            if (records[index]["frameType"].equals(SeConstants.FRAME_CHECKPOINT)) { return records[index]; }
+        }
+        return null;
+    }
+}
+
+(:test)
+function seChecksumDetectsChangedPayload(logger) {
+    var checksum = new SeChecksum();
+    return checksum.calculate("stable") != checksum.calculate("stAble");
+}
+
+(:test)
+function seFrameValidatesLengthAndChecksum(logger) {
+    var codec = new SeFrame();
+    var frame = codec.create(0, SeConstants.FRAME_SESSION_START, "session=synthetic");
+    if (!codec.validate(frame)) { return false; }
+    frame["payload"] = "session=changed";
+    return !codec.validate(frame);
+}
+
+(:test)
+function seClockHandlesRollover(logger) {
+    return new SeClock().elapsed(4294967290l, 4) == 10;
+}
+
+(:test)
+function seEngineCompletesOnlyAfterValidFinal(logger) {
+    var store = new SeTestStore();
+    var clock = new SeTestClock();
+    var engine = new SessionEngine(store, clock);
+    if (!engine.prepare() || !engine.start()) { return false; }
+    clock.monotonic += 2000;
+    engine.ingestPosition(2000, 0.001, 0.001, 4, 3);
+    if (!engine.stop()) { return false; }
+    return engine.state().equals(SeConstants.STATE_COMPLETED) && store.validate(engine.sessionId())["integrity"].equals("VALID");
+}
+
+(:test)
+function seEngineFailsClosedOnAppendFailure(logger) {
+    var store = new SeTestStore();
+    var engine = new SessionEngine(store, new SeTestClock());
+    if (!engine.prepare()) { return false; }
+    store.failAppend = true;
+    return !engine.start() && engine.state().equals(SeConstants.STATE_FAILED);
+}
+
+(:test)
+function seRecoveryPreservesSessionIdentity(logger) {
+    var store = new SeTestStore();
+    var clock = new SeTestClock();
+    var first = new SessionEngine(store, clock);
+    if (!first.prepare() || !first.start()) { return false; }
+    var original = first.sessionId();
+    var recovered = new SessionEngine(store, clock);
+    if (!recovered.recoverFirst()) { return false; }
+    if (!recovered.sessionId().equals(original) || !recovered.state().equals(SeConstants.STATE_RECOVERED)) { return false; }
+    return recovered.finalizeRecovered() && recovered.state().equals(SeConstants.STATE_COMPLETED);
+}

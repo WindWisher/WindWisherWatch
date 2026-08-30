@@ -1,0 +1,9 @@
+{"recordType":"manifest","labSchemaVersion":"1.0.0","experimentId":"synthetic-valid-001","appVersion":"0.1.0-m1","sdkVersion":"synthetic","ciqApiLevel":"synthetic","profile":"HIGH","environment":{"kind":"SYNTHETIC_FIXTURE","protocol":"T0"},"startedAt":"2026-08-29T12:00:00Z","device":{"model":"Synthetic Garmin","firmware":"synthetic"},"requestedRatesHz":{"accelerometer":50}}
+{"recordType":"runtime","monotonicMilliseconds":1000,"batteryPercent":80,"freeMemoryBytes":400000,"usedMemoryBytes":100000,"totalMemoryBytes":500000}
+{"recordType":"sample","sensor":"accelerometer","sequence":0,"monotonicMilliseconds":1000,"callbackMonotonicMilliseconds":1002,"raw":{"x":1,"y":2,"z":1000,"units":"millig"},"normalized":{"xMetersPerSecondSquared":0.00980665,"yMetersPerSecondSquared":0.0196133,"zMetersPerSecondSquared":9.80665},"provenance":{"source":"Toybox.Sensor.AccelerometerData","conversion":"millig_to_mps2"}}
+{"recordType":"sample","sensor":"accelerometer","sequence":1,"monotonicMilliseconds":1020,"callbackMonotonicMilliseconds":1022,"raw":{"x":2,"y":2,"z":999,"units":"millig"}}
+{"recordType":"sample","sensor":"accelerometer","sequence":2,"monotonicMilliseconds":1040,"callbackMonotonicMilliseconds":1042,"raw":{"x":3,"y":2,"z":1001,"units":"millig"}}
+{"recordType":"sample","sensor":"accelerometer","sequence":3,"monotonicMilliseconds":1060,"callbackMonotonicMilliseconds":1062,"raw":{"x":2,"y":1,"z":1000,"units":"millig"}}
+{"recordType":"sample","sensor":"accelerometer","sequence":4,"monotonicMilliseconds":1080,"callbackMonotonicMilliseconds":1082,"raw":{"x":1,"y":1,"z":1000,"units":"millig"}}
+{"recordType":"runtime","monotonicMilliseconds":2000,"batteryPercent":79,"freeMemoryBytes":375000,"usedMemoryBytes":125000,"totalMemoryBytes":500000}
+{"recordType":"completion","endedAt":"2026-08-29T12:00:01Z","monotonicMilliseconds":2000,"result":"COMPLETED","warnings":[]}

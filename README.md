@@ -4,7 +4,7 @@ WindWisherWatch is the pre-alpha wearable instrument for recording offline kites
 
 ## Status
 
-**M0 — Foundation.** This repository defines product boundaries, architecture, versioned contracts, realistic fixtures, automated validation, and the technical roadmap. Garmin is the first implementation target; watchOS and Wear OS follow with native implementations.
+**M2 — Session Engine Foundation complete.** The offline-first core has an explicit lifecycle, bounded checksum-protected journal, checkpoints, conservative recovery, quality events and a separate Garmin developer harness. Normal finalization and interrupted-session recovery are verified on representative Garmin hardware; the Jump Engine is deferred.
 
 ## Architecture at a glance
 
@@ -21,6 +21,7 @@ Data flows from the wearable's local session journal through an idempotent `Sync
 - `research/`: bounded research backlogs; no unverified platform claims.
 - `platforms/`: boundary READMEs for future native implementations.
 - `tools/contracts/`: independent Node-based validation and architectural guards.
+- `tools/garmin-sensor-lab/`: dataset parser, timing/resource analysis, fixtures, and M1 source guards.
 
 ## Validate the foundation
 
@@ -39,7 +40,7 @@ WindWisherWatch records and owns the durable on-device copy until acknowledged s
 
 ## Roadmap
 
-M0 establishes the foundation. The next milestone is **M1 — Garmin Sensor Lab**, followed by raw recording, experimental Jump Engine work, empirical Woo comparison, Garmin UX and synchronization, production hardening, watchOS, and Wear OS. See [the detailed roadmap](docs/ROADMAP.md).
+M0, M1 hardware characterization and **M2 — Session Engine Foundation** are complete. M2 remains separate from future Jump Engine research and product analytics. See [the detailed roadmap](docs/ROADMAP.md).
 
 ## Development
 

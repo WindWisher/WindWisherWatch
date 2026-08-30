@@ -1,0 +1,6 @@
+{"recordType":"manifest","labSchemaVersion":"1.0.0","experimentId":"synthetic-gap-001","appVersion":"0.1.0-m1","sdkVersion":"synthetic","ciqApiLevel":"synthetic","profile":"HIGH","environment":{"kind":"SYNTHETIC_FIXTURE","protocol":"T0"},"startedAt":"2026-08-29T12:00:00Z","device":{"model":"Synthetic Garmin","firmware":"synthetic"},"requestedRatesHz":{"accelerometer":50}}
+{"recordType":"sample","sensor":"accelerometer","sequence":0,"monotonicMilliseconds":1000,"raw":{"x":0,"y":0,"z":1000}}
+{"recordType":"sample","sensor":"accelerometer","sequence":1,"monotonicMilliseconds":1020,"raw":{"x":0,"y":0,"z":1000}}
+{"recordType":"sample","sensor":"accelerometer","sequence":2,"monotonicMilliseconds":1040,"raw":{"x":0,"y":0,"z":1000}}
+{"recordType":"sample","sensor":"accelerometer","sequence":3,"monotonicMilliseconds":1240,"raw":{"x":0,"y":0,"z":1000}}
+{"recordType":"completion","endedAt":"2026-08-29T12:00:01Z","monotonicMilliseconds":2000,"result":"COMPLETED","warnings":[]}

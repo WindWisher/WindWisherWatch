@@ -1,0 +1,5 @@
+{"recordType":"manifest","labSchemaVersion":"1.0.0","experimentId":"synthetic-duplicate-001","appVersion":"0.1.0-m1","sdkVersion":"synthetic","ciqApiLevel":"synthetic","profile":"HIGH","environment":{"kind":"SYNTHETIC_FIXTURE","protocol":"T1"},"startedAt":"2026-08-29T12:00:00Z","device":{"model":"Synthetic Garmin","firmware":"synthetic"},"requestedRatesHz":{"gyroscope":50}}
+{"recordType":"sample","sensor":"gyroscope","sequence":0,"monotonicMilliseconds":1000,"raw":{"x":0,"y":0,"z":0}}
+{"recordType":"sample","sensor":"gyroscope","sequence":1,"monotonicMilliseconds":1020,"raw":{"x":1,"y":0,"z":0}}
+{"recordType":"sample","sensor":"gyroscope","sequence":2,"monotonicMilliseconds":1020,"raw":{"x":2,"y":0,"z":0}}
+{"recordType":"completion","endedAt":"2026-08-29T12:00:01Z","monotonicMilliseconds":2000,"result":"COMPLETED","warnings":[]}

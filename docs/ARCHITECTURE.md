@@ -18,7 +18,7 @@ The watch owns the durable local recording until the backend acknowledges all pa
 flowchart LR
   PS[Platform sensors] --> SA[Sensor adapters]
   SA --> SE[Session engine]
-  SE --> JE[Future Jump Engine]
+  SE -->|selected synchronized signals| JE[Future Jump Engine subsystem]
   SE --> LS[Local journal/store]
   JE --> LS
   SE --> VM[Presentation model]
@@ -27,6 +27,12 @@ flowchart LR
 ```
 
 UI issues commands through the session/application boundary and consumes projections; it never controls sensors or mutates persistence directly. Native adapters map platform data to contract semantics. Garmin uses Monkey C, watchOS Swift/SwiftUI, and Wear OS Kotlin/Compose; no shared UI/runtime is required.
+
+The **Session Engine is the wearable core**. It owns lifecycle, time, track, heart rate, essential live metrics, local durability, recovery, and health/quality. The future Jump Engine is one specialized subsystem: it consumes selected signals and emits `JumpEvent`; it owns neither session state, general storage, synchronization, UI, global GPS/HR, nor recovery.
+
+M2 realizes this boundary through platform sensor adapters, a deterministic engine, and a small `SessionStore` port. The journal is sequence-ordered, chunked, checksum-protected and checkpointed; a session becomes completed only after its final frame validates. Raw full-session IMU is excluded from canonical persistence by default.
+
+The watch acquires raw evidence and computes only live essentials. The main WindWisher application owns enrichment, historical analytics, advanced navigation metrics, comparisons, scoring, progression, and detailed visualization. A computation belongs on-watch only when the rider needs it live, the Session Engine needs it to function, or a live event detector requires it.
 
 ## Domain contracts
 
@@ -38,7 +44,7 @@ The minimal recording lifecycle is `prepared -> recording <-> paused -> stopping
 
 An append-only journal with framed records, monotonic sequence, checksums, periodic durable checkpoints, and a completion marker is the baseline design. Recovery scans to the last valid frame, rejects or quarantines the corrupt tail, and never invents samples. Platform stores may differ while preserving these invariants.
 
-## Future Jump Engine
+## Future Jump Engine subsystem
 
 The isolated engine accepts normalized sensor streams plus `DeviceCapabilities`, emits `JumpEvent`, and selects a documented strategy by actual capabilities. Its conceptual pipeline is acquisition input -> timestamp normalization -> preprocessing -> motion classification -> takeoff -> flight -> apex -> landing -> height/airtime/distance estimation -> confidence -> validation. Raw observations remain distinct from derived estimates and metadata.
 
