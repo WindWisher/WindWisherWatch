@@ -58,7 +58,7 @@ function seEngineCompletesOnlyAfterValidFinal(logger) {
     var engine = new SessionEngine(store, clock);
     if (!engine.prepare() || !engine.start()) { return false; }
     clock.monotonic += 2000;
-    engine.ingestPosition(2000, 0.001, 0.001, 4, 3);
+    engine.ingestPosition(2000, 0.001, 0.001, 4, 3, true);
     if (!engine.stop()) { return false; }
     return engine.state().equals(SeConstants.STATE_COMPLETED) && store.validate(engine.sessionId())["integrity"].equals("VALID");
 }
@@ -83,4 +83,47 @@ function seRecoveryPreservesSessionIdentity(logger) {
     if (!recovered.recoverFirst()) { return false; }
     if (!recovered.sessionId().equals(original) || !recovered.state().equals(SeConstants.STATE_RECOVERED)) { return false; }
     return recovered.finalizeRecovered() && recovered.state().equals(SeConstants.STATE_COMPLETED);
+}
+
+(:test)
+function seCoreMetricsAccumulateDistanceAndMaximumSpeed(logger) {
+    var metrics = new CoreMetricProjector();
+    if (metrics.ingestPosition(0, 0.0, 0.0, 2.0, true) != null) { return false; }
+    if (metrics.ingestPosition(10000, 0.0, 0.0001, 4.0, true) != null) { return false; }
+    return metrics.distance() > 11.0 && metrics.distance() < 11.3 && metrics.maximumSpeed() == 4.0 && metrics.validGpsCount() == 2;
+}
+
+(:test)
+function seCoreMetricsRejectGpsSpike(logger) {
+    var metrics = new CoreMetricProjector();
+    metrics.ingestPosition(0, 0.0, 0.0, 2.0, true);
+    var issue = metrics.ingestPosition(1000, 0.0, 1.0, 2.0, true);
+    return issue.equals("GPS_SPIKE") && metrics.distance() == 0.0 && metrics.rejectedSegmentCount() == 1;
+}
+
+(:test)
+function seCoreMetricsExposeFreshnessWithoutFakeZero(logger) {
+    var metrics = new CoreMetricProjector();
+    if (!metrics.gpsStatus(0).equals("UNAVAILABLE") || metrics.currentSpeed(0) != null) { return false; }
+    metrics.ingestPosition(1000, 0.0, 0.0, 0.0, true);
+    if (!metrics.gpsStatus(2000).equals("VALID") || metrics.currentSpeed(2000) != 0.0) { return false; }
+    return metrics.gpsStatus(12000).equals("STALE") && metrics.currentSpeed(12000) == null;
+}
+
+(:test)
+function seRecoveryRestoresCoreMetricsFromCheckpoint(logger) {
+    var store = new SeTestStore();
+    var clock = new SeTestClock();
+    var first = new SessionEngine(store, clock);
+    if (!first.prepare() || !first.start()) { return false; }
+    first.ingestPosition(0, 0.0, 0.0, 2.0, 3, true);
+    first.ingestPosition(10000, 0.0, 0.0001, 4.0, 3, true);
+    first.ingestHeartRate(10000, 120);
+    clock.monotonic += 60000;
+    if (!first.tick()) { return false; }
+    var expected = first.liveState();
+    var recovered = new SessionEngine(store, clock);
+    if (!recovered.recoverFirst()) { return false; }
+    var actual = recovered.liveState();
+    return actual["distanceMeters"] == expected["distanceMeters"] && actual["maximumSpeedMps"] == expected["maximumSpeedMps"] && actual["validGpsSampleCount"] == expected["validGpsSampleCount"];
 }

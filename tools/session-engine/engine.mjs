@@ -1,9 +1,5 @@
-import {
-  FrameType,
-  SESSION_SCHEMA_VERSION,
-  encodeFrame,
-  parseJournal,
-} from "./journal.mjs";
+import { FrameType, SESSION_SCHEMA_VERSION, encodeFrame } from "./journal.mjs";
+import { CoreMetricProjector } from "./core-metrics.mjs";
 
 export const SessionState = Object.freeze({
   IDLE: "IDLE",
@@ -29,6 +25,12 @@ export const QualityCode = Object.freeze({
   RECOVERY_APPLIED: "RECOVERY_APPLIED",
   PARTIAL_TAIL_DISCARDED: "PARTIAL_TAIL_DISCARDED",
   BUFFER_OVERFLOW: "BUFFER_OVERFLOW",
+  GPS_DUPLICATE: "GPS_DUPLICATE",
+  GPS_BACKWARD_TIMESTAMP: "GPS_BACKWARD_TIMESTAMP",
+  GPS_INVALID_SPEED: "GPS_INVALID_SPEED",
+  GPS_SPIKE: "GPS_SPIKE",
+  HR_UNAVAILABLE: "HR_UNAVAILABLE",
+  HR_INVALID: "HR_INVALID",
 });
 
 export const QualitySeverity = Object.freeze({
@@ -87,6 +89,7 @@ export class SessionEngine {
     bufferLimit = 32,
     qualityEventLimit = 16,
     minimumFreeMemoryBytes = 24_576,
+    metricProjector = new CoreMetricProjector(),
   }) {
     this.store = store;
     this.clock = clock;
@@ -95,6 +98,7 @@ export class SessionEngine {
     this.qualityEventLimit = qualityEventLimit;
     this.minimumFreeMemoryBytes = minimumFreeMemoryBytes;
     this.buffer = new BoundedRecordBuffer(bufferLimit);
+    this.metrics = metricProjector;
     this.reset();
   }
 
@@ -121,6 +125,7 @@ export class SessionEngine {
     this.qualityEvents = [];
     this.lastPersistedSequence = -1;
     this.persistenceError = null;
+    this.metrics.reset();
   }
 
   requireState(...allowed) {
@@ -202,14 +207,11 @@ export class SessionEngine {
     this.requireState(SessionState.RECORDING);
     this.sampleCounters.position += 1;
     this.latestPosition = structuredClone(sample);
-    if (
-      Number.isFinite(sample.groundSpeedMps) &&
-      sample.groundSpeedMps >= 0 &&
-      sample.groundSpeedMps <= 80
-    )
-      this.currentSpeedMps = sample.groundSpeedMps;
-    if (sample.usable === false)
-      this.recordQuality(QualityCode.GPS_POOR_FIX, QualitySeverity.WARNING);
+    for (const code of this.metrics.ingestPosition(sample))
+      this.recordQuality(code, QualitySeverity.WARNING);
+    this.currentSpeedMps = this.metrics.snapshot(
+      this.elapsedMilliseconds(),
+    ).currentSpeedMps;
     this.enqueue(FrameType.POSITION, sample, Priority.HIGH);
     this.flush();
   }
@@ -218,6 +220,8 @@ export class SessionEngine {
     this.requireState(SessionState.RECORDING);
     this.sampleCounters.heartRate += 1;
     this.latestHeartRate = structuredClone(sample);
+    for (const code of this.metrics.ingestHeartRate(sample))
+      this.recordQuality(code, QualitySeverity.WARNING);
     this.enqueue(FrameType.HEART_RATE, sample, Priority.MEDIUM);
     this.flush();
   }
@@ -338,6 +342,7 @@ export class SessionEngine {
       latestPosition: this.latestPosition,
       latestHeartRate: this.latestHeartRate,
       currentSpeedMps: this.currentSpeedMps,
+      metricState: this.metrics.checkpointState(),
       sampleCounters: structuredClone(this.sampleCounters),
       qualityCounters: structuredClone(this.qualityCounters),
       lastDurableSequence: this.lastPersistedSequence,
@@ -361,7 +366,10 @@ export class SessionEngine {
         completedAtEpochSeconds: this.clock.epochSeconds(),
       };
       this.appendCritical(FrameType.SESSION_FINAL, finalPayload);
-      const integrity = this.store.validate(this.sessionId);
+      const integrity = this.store.validateTail(
+        this.sessionId,
+        this.lastPersistedSequence,
+      );
       if (integrity.integrity !== "VALID")
         throw Object.assign(
           new Error("Durable finalization verification failed"),
@@ -381,9 +389,9 @@ export class SessionEngine {
 
   recover(sessionId) {
     this.requireState(SessionState.IDLE);
-    const bytes = this.store.read(sessionId);
-    if (bytes === null) throw new Error("Session does not exist");
-    const parsed = parseJournal(bytes);
+    const parsed = this.store.recoveryView?.(sessionId);
+    if (parsed === null || parsed === undefined)
+      throw new Error("Session does not exist");
     if (parsed.integrity === "VALID")
       throw new Error("Completed session does not require recovery");
     if (
@@ -440,6 +448,7 @@ export class SessionEngine {
     this.latestPosition = payload.latestPosition;
     this.latestHeartRate = payload.latestHeartRate;
     this.currentSpeedMps = payload.currentSpeedMps;
+    this.metrics.restore(payload.metricState);
     this.sampleCounters = { ...this.sampleCounters, ...payload.sampleCounters };
     this.qualityCounters = { ...payload.qualityCounters };
   }
@@ -447,11 +456,14 @@ export class SessionEngine {
   applyFrame(frame) {
     if (frame.type === FrameType.POSITION) {
       this.latestPosition = frame.payload;
-      this.currentSpeedMps =
-        frame.payload.groundSpeedMps ?? this.currentSpeedMps;
+      this.metrics.ingestPosition(frame.payload);
+      this.currentSpeedMps = this.metrics.snapshot(
+        frame.payload.relativeMilliseconds ?? this.elapsedBeforeSegment,
+      ).currentSpeedMps;
       this.sampleCounters.position += 1;
     } else if (frame.type === FrameType.HEART_RATE) {
       this.latestHeartRate = frame.payload;
+      this.metrics.ingestHeartRate(frame.payload);
       this.sampleCounters.heartRate += 1;
     } else if (frame.type === FrameType.PRESSURE)
       this.sampleCounters.pressure += 1;
@@ -490,7 +502,10 @@ export class SessionEngine {
         completedAtEpochSeconds: this.clock.epochSeconds(),
         recovered: true,
       });
-      if (this.store.validate(this.sessionId).integrity !== "VALID")
+      if (
+        this.store.validateTail(this.sessionId, this.lastPersistedSequence)
+          .integrity !== "VALID"
+      )
         throw new Error("Recovered finalization failed");
       this.store.updateIndex(this.sessionId, {
         state: SessionState.COMPLETED,
@@ -510,11 +525,23 @@ export class SessionEngine {
   }
 
   liveState() {
+    const elapsedMilliseconds = this.elapsedMilliseconds();
+    const metricState = this.metrics.snapshot(elapsedMilliseconds);
     return Object.freeze({
       sessionId: this.sessionId,
       state: this.state,
-      elapsedMilliseconds: this.elapsedMilliseconds(),
-      currentSpeedMps: this.currentSpeedMps,
+      elapsedMilliseconds,
+      wallClockEpochSeconds: this.clock.epochSeconds(),
+      currentSpeedMps: metricState.currentSpeedMps,
+      maximumSpeedMps: metricState.maximumSpeedMps,
+      distanceMeters: metricState.distanceMeters,
+      heartRateBpm: metricState.heartRateBpm,
+      gpsStatus: metricState.gpsStatus,
+      gpsAgeMilliseconds: metricState.gpsAgeMilliseconds,
+      heartRateStatus: metricState.heartRateStatus,
+      heartRateAgeMilliseconds: metricState.heartRateAgeMilliseconds,
+      validGpsSampleCount: metricState.validGpsSampleCount,
+      rejectedSegmentCount: metricState.rejectedSegmentCount,
       latestHeartRate: this.latestHeartRate,
       gpsQuality: this.latestPosition?.quality ?? null,
       sampleCounters: Object.freeze({ ...this.sampleCounters }),
@@ -525,6 +552,11 @@ export class SessionEngine {
       lastPersistedSequence: this.lastPersistedSequence,
       bufferedRecords: this.buffer.length,
       persistenceError: this.persistenceError,
+      recordingHealth:
+        this.state === SessionState.FAILED ? "FAILED" : "AVAILABLE",
+      persistenceHealth: this.persistenceError === null ? "VALID" : "DEGRADED",
+      qualitySummary:
+        Object.keys(this.qualityCounters).length === 0 ? "VALID" : "DEGRADED",
     });
   }
 }

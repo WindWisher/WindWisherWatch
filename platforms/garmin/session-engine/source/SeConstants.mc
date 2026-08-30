@@ -1,13 +1,18 @@
 module SeConstants {
-    const APP_VERSION = "0.1.0-m2";
+    const APP_VERSION = "0.2.0-m3";
     const JOURNAL_FORMAT_VERSION = 1;
     const SESSION_SCHEMA_VERSION = "1.0.0";
     const FRAME_MAGIC = "WWJF";
     const MAX_PAYLOAD_CHARACTERS = 512;
     const MAX_FRAMES_PER_CHUNK = 16;
+    const MAX_RECOVERY_SCAN_CHUNKS = 16;
     const CHECKPOINT_INTERVAL_MILLISECONDS = 60000;
     const LOW_MEMORY_BYTES = 24576;
     const INDEX_KEY = "se.index.v1";
+    const MAXIMUM_SPEED_MPS = 80.0;
+    const EARTH_RADIUS_METERS = 6371000.0;
+    const GPS_STALE_MILLISECONDS = 10000;
+    const HR_STALE_MILLISECONDS = 15000;
 
     const STATE_IDLE = "IDLE";
     const STATE_PREPARING = "PREPARING";

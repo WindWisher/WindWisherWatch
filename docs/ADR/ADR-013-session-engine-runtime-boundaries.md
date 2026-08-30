@@ -9,6 +9,8 @@ The Session Engine is the wearable application core. Its lifecycle uses monotoni
 
 The watch owns primary acquisition, durability and essential live state. WindWisher owns advanced post-session analytics. The future Jump Engine remains an isolated Session Engine capability and is not implemented by M2.
 
+M3 implements live essentials as a separate constant-size incremental projection in canonical SI units. It retains only the previous accepted position and compact accumulators; presentation conversion and advanced analytics remain outside the projector.
+
 ## Context
 
 ADR-003 selected offline-first framed recording and ADR-004 isolated the future Jump Engine. M1.1-B established stable callback, memory, battery and small-storage primitives, while also finding rare IMU timestamp and gyroscope anomalies. M2 requires executable boundaries and resource policies.
@@ -21,3 +23,5 @@ ADR-003 selected offline-first framed recording and ADR-004 isolated the future 
 - Index metadata is a locator; validated journal content is authoritative.
 - Automatic recording resume after relaunch is deferred; recovery produces `RECOVERED` and requires explicit finalization.
 - Motion quality can be persisted, but raw motion samples are not canonical session frames.
+- Current/max speed, distance and latest HR are O(1) projections recoverable from compact checkpoints.
+- Finalization validates a bounded tail and never recomputes metrics from the full journal.

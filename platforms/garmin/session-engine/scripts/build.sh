@@ -14,4 +14,4 @@ if [[ -z "${GARMIN_DEVELOPER_KEY:-}" || ! -f "${GARMIN_DEVELOPER_KEY}" ]]; then
 fi
 
 mkdir -p "$(dirname "${garmin_output}")"
-monkeyc -f monkey.jungle -d "${garmin_target_device}" -y "${GARMIN_DEVELOPER_KEY}" -o "${garmin_output}"
+monkeyc -f monkey.jungle -d "${garmin_target_device}" -y "${GARMIN_DEVELOPER_KEY}" -l 2 -o "${garmin_output}"

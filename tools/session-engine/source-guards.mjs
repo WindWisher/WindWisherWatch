@@ -15,6 +15,7 @@ const required = [
   "source/SeFrame.mc",
   "source/SeChecksum.mc",
   "source/SeClock.mc",
+  "source/CoreMetricProjector.mc",
   "source/SessionPositionSource.mc",
   "source/SessionHealthSource.mc",
   "source/SessionDevApp.mc",
@@ -53,6 +54,19 @@ for (const forbidden of [
     );
 }
 
+for (const forbidden of [
+  "averageSpeed",
+  "p95",
+  "activeTime",
+  "VMG",
+  "tack",
+  "jibe",
+])
+  if (source.includes(forbidden))
+    throw new Error(
+      `Garmin M3 source contains post-session metric: ${forbidden}`,
+    );
+
 const manifest = await fs.readFile(path.join(project, "manifest.xml"), "utf8");
 for (const permission of ["Positioning", "Sensor"])
   if (!manifest.includes(`id="${permission}"`))
@@ -77,6 +91,27 @@ if (
 )
   throw new Error("M2 Garmin journal lacks checkpoint/final frame semantics");
 
+const engineSource = await fs.readFile(
+  path.join(project, "source/SessionEngine.mc"),
+  "utf8",
+);
+const stopBody = engineSource.substring(
+  engineSource.indexOf("function stop()"),
+  engineSource.indexOf("function recoverFirst()"),
+);
+if (stopBody.includes("for (") || stopBody.includes("frames("))
+  throw new Error("M3 stop complexity must remain bounded");
+if (
+  !source.includes("CoreMetricProjector") ||
+  !source.includes("distanceMeters")
+)
+  throw new Error("M3 core metric projection is missing");
+if (
+  !source.includes('metadata["checkpointChunk"]') ||
+  !source.includes('metadata["checkpointFrame"]')
+)
+  throw new Error("M3 Garmin recovery lacks a direct checkpoint pointer");
+
 console.log(
-  `Session Engine source guards passed: ${required.length} artifacts; bounds, permissions and scope verified.`,
+  `Session Engine source guards passed: ${required.length} artifacts; M3 bounds, stop complexity, permissions and scope verified.`,
 );

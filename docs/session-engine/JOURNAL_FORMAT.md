@@ -32,3 +32,5 @@ Garmin stores equivalent framed dictionaries in Object Store chunks of at most 1
 Frame types: start, position, HR, pressure, runtime, quality, checkpoint, stop and final. There is deliberately no raw motion frame.
 
 Checkpoint cadence defaults to 60 seconds: a bounded recovery-loss window with roughly one small metadata write per minute. It is configurable in deterministic tests.
+
+M3 checkpoints add compact Core Metric projection state. Metrics are not duplicated into every frame, and the final operational summary remains within the same 512-character Garmin payload bound. Finalization validates only the last bounded chunk.

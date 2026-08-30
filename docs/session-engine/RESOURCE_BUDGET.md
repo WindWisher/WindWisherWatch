@@ -16,3 +16,5 @@ Ordering is write chunk → read/checksum verification → index update. Critica
 On low memory the engine flushes what is already bounded, emits quality and fails safely rather than pretending to record. On storage failure finalization cannot become `COMPLETED`.
 
 M1.1-B observed approximately 751 KiB minimum free in half-hour combined runs. M2 adds persistence and therefore requires its own simulator/hardware observations before production claims.
+
+M3 metric state is constant-size: one accepted position, latest speed/HR timestamps, three live accumulators and bounded counters. An eight-hour virtual host run retains the same state shape. Physical movement and recovery smokes completed without a low-memory event, but no new battery/autonomy or broad-device claim is made.

@@ -28,6 +28,7 @@ export class MemorySessionStore {
     this.sessions.set(metadata.sessionId, {
       chunks: [Buffer.alloc(0)],
       metadata: structuredClone(metadata),
+      startFrame: null,
     });
     this.index.set(metadata.sessionId, {
       sessionId: metadata.sessionId,
@@ -53,6 +54,8 @@ export class MemorySessionStore {
       session.chunks[chunkIndex],
       frame,
     ]);
+    const decoded = parseJournal(frame).frames[0];
+    if (decoded?.type === 1) session.startFrame = decoded;
     return { chunkIndex, chunkLength: session.chunks[chunkIndex].length };
   }
 
@@ -64,7 +67,18 @@ export class MemorySessionStore {
     this.maybeFail("updateIndex");
     const current = this.index.get(sessionId);
     if (!current) throw new Error("Index entry does not exist");
-    this.index.set(sessionId, { ...current, ...structuredClone(patch) });
+    const checkpointLocation =
+      patch.checkpointSequence === undefined
+        ? {}
+        : {
+            checkpointChunkIndex:
+              this.sessions.get(sessionId).chunks.length - 1,
+          };
+    this.index.set(sessionId, {
+      ...current,
+      ...structuredClone(patch),
+      ...checkpointLocation,
+    });
   }
 
   read(sessionId) {
@@ -81,9 +95,33 @@ export class MemorySessionStore {
   }
 
   discoverRecoverable() {
-    return [...this.sessions.keys()].filter(
-      (sessionId) => parseJournal(this.read(sessionId)).integrity !== "VALID",
+    return [...this.sessions.keys()].filter((sessionId) => {
+      const entry = this.index.get(sessionId);
+      return (
+        this.validateTail(sessionId, entry?.lastSequence ?? -1).integrity !==
+        "VALID"
+      );
+    });
+  }
+
+  recoveryView(sessionId) {
+    const session = this.sessions.get(sessionId);
+    const entry = this.index.get(sessionId);
+    if (!session || !session.startFrame) return null;
+    if (!Number.isInteger(entry?.checkpointChunkIndex))
+      return parseJournal(this.read(sessionId));
+    const tail = parseJournal(
+      Buffer.concat(session.chunks.slice(entry.checkpointChunkIndex)),
     );
+    return {
+      ...tail,
+      frames: [
+        session.startFrame,
+        ...tail.frames.filter(
+          (frame) => frame.sequence !== session.startFrame.sequence,
+        ),
+      ],
+    };
   }
 
   validate(sessionId) {
@@ -97,11 +135,29 @@ export class MemorySessionStore {
       : parseJournal(bytes);
   }
 
+  validateTail(sessionId, expectedFinalSequence) {
+    const chunks = this.sessions.get(sessionId)?.chunks;
+    if (!chunks || chunks.length === 0)
+      return { integrity: "CORRUPT", frames: [], hasFinal: false };
+    const parsed = parseJournal(chunks.at(-1));
+    const finalFrame = parsed.frames.at(-1);
+    return {
+      ...parsed,
+      integrity:
+        parsed.issues.length === 0 &&
+        finalFrame?.type === 9 &&
+        finalFrame.sequence === expectedFinalSequence
+          ? "VALID"
+          : "RECOVERABLE",
+    };
+  }
+
   corruptTail(sessionId, transform) {
     const session = this.sessions.get(sessionId);
     const joined = Buffer.concat(session.chunks);
     const changed = transform(Buffer.from(joined));
     session.chunks = [changed];
+    this.index.get(sessionId).checkpointChunkIndex = null;
   }
 
   delete(sessionId) {

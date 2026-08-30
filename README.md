@@ -4,7 +4,7 @@ WindWisherWatch is the pre-alpha wearable instrument for recording offline kites
 
 ## Status
 
-**M2 — Session Engine Foundation complete.** The offline-first core has an explicit lifecycle, bounded checksum-protected journal, checkpoints, conservative recovery, quality events and a separate Garmin developer harness. Normal finalization and interrupted-session recovery are verified on representative Garmin hardware; the Jump Engine is deferred.
+**M3 — Core Session Metrics complete.** Incremental time, current/max speed, distance, HR and GPS freshness use constant-size recoverable state. Movement, normal finalization, legacy-checkpoint recovery and direct-checkpoint recovery are verified on representative Garmin hardware. The Jump Engine is deferred.
 
 ## Architecture at a glance
 
@@ -40,7 +40,7 @@ WindWisherWatch records and owns the durable on-device copy until acknowledged s
 
 ## Roadmap
 
-M0, M1 hardware characterization and **M2 — Session Engine Foundation** are complete. M2 remains separate from future Jump Engine research and product analytics. See [the detailed roadmap](docs/ROADMAP.md).
+M0, M1 hardware characterization, M2 and **M3 — Core Session Metrics** are complete. M3 remains separate from future Jump Engine research and product analytics. See [the detailed roadmap](docs/ROADMAP.md).
 
 ## Development
 

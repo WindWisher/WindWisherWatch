@@ -33,6 +33,8 @@ test("runs valid lifecycle and verifies durable final before completed", () => {
   clock.advance(500);
   engine.ingestPosition({
     relativeMilliseconds: 500,
+    latitudeDegrees: 0,
+    longitudeDegrees: 0,
     groundSpeedMps: 4,
     quality: "GOOD",
     usable: true,
@@ -132,7 +134,14 @@ test("recovers missing finalization and preserves session identity", () => {
   });
   engine.prepare({ deviceReference: "synthetic" });
   engine.start();
-  engine.ingestPosition({ groundSpeedMps: 5, quality: "GOOD" });
+  engine.ingestPosition({
+    relativeMilliseconds: 0,
+    latitudeDegrees: 0,
+    longitudeDegrees: 0,
+    groundSpeedMps: 5,
+    quality: "GOOD",
+    usable: true,
+  });
   clock.advance(1200);
   engine.tick();
 
@@ -200,4 +209,63 @@ test("low memory stops accepting an apparently healthy recording", () => {
   engine.ingestRuntime({ freeMemoryBytes: 1000, usedMemoryBytes: 100 });
   assert.equal(engine.liveState().state, SessionState.FAILED);
   assert.equal(engine.liveState().qualityCounters.LOW_MEMORY, 1);
+});
+
+test("recovery restores metric projection without duplicating distance", () => {
+  const { engine, store, clock } = harness({
+    sessionId: "metric-recovery",
+    checkpointIntervalMilliseconds: 1000,
+  });
+  engine.prepare({ deviceReference: "synthetic" });
+  engine.start();
+  engine.ingestPosition({
+    relativeMilliseconds: 0,
+    latitudeDegrees: 0,
+    longitudeDegrees: 0,
+    groundSpeedMps: 2,
+    usable: true,
+  });
+  clock.advance(10_000);
+  engine.ingestPosition({
+    relativeMilliseconds: 10_000,
+    latitudeDegrees: 0,
+    longitudeDegrees: 0.0001,
+    groundSpeedMps: 4,
+    usable: true,
+  });
+  engine.ingestHeartRate({ relativeMilliseconds: 10_000, bpm: 121 });
+  engine.tick();
+  const before = engine.liveState();
+  store.read = () => {
+    throw new Error("whole journal read called during checkpoint recovery");
+  };
+  const recovered = new SessionEngine({
+    store,
+    clock,
+    idFactory: () => "unused",
+  });
+  const after = recovered.recover("metric-recovery").liveState;
+  assert.equal(after.distanceMeters, before.distanceMeters);
+  assert.equal(after.maximumSpeedMps, before.maximumSpeedMps);
+  assert.equal(after.currentSpeedMps, before.currentSpeedMps);
+  assert.equal(after.heartRateBpm, before.heartRateBpm);
+  assert.equal(after.validGpsSampleCount, before.validGpsSampleCount);
+});
+
+test("stop verifies only the bounded tail, never the whole journal", () => {
+  const { engine, store } = harness({ checkpointIntervalMilliseconds: 60_000 });
+  engine.prepare({ deviceReference: "synthetic" });
+  engine.start();
+  for (let index = 0; index < 1000; index += 1)
+    engine.ingestPosition({
+      relativeMilliseconds: index * 1000,
+      latitudeDegrees: 0,
+      longitudeDegrees: index * 0.000001,
+      groundSpeedMps: 1,
+      usable: true,
+    });
+  store.validate = () => {
+    throw new Error("whole journal validation called during stop");
+  };
+  assert.equal(engine.stop().state, SessionState.COMPLETED);
 });

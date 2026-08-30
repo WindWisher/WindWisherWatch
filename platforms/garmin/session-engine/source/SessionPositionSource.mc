@@ -25,7 +25,7 @@ class SessionPositionSource {
     function onPosition(info as Position.Info) as Void {
         if (info.position == null) { _controller.quality("GPS_UNAVAILABLE"); return; }
         var degrees = info.position.toDegrees();
-        var speed = info.speed == null ? 0 : info.speed;
-        _controller.position(degrees[0], degrees[1], speed, info.accuracy);
+        var usable = info.accuracy == Position.QUALITY_USABLE || info.accuracy == Position.QUALITY_GOOD;
+        _controller.position(degrees[0], degrees[1], info.speed, info.accuracy, usable);
     }
 }

@@ -9,7 +9,7 @@ class GarminSessionStore {
     function create(sessionId, startedAt) {
         var index = readIndex();
         if (index[sessionId] != null) { return false; }
-        index[sessionId] = { "state" => SeConstants.STATE_PREPARING, "startedAt" => startedAt, "lastSequence" => -1, "lastChunk" => 0 };
+        index[sessionId] = { "state" => SeConstants.STATE_PREPARING, "startedAt" => startedAt, "lastSequence" => -1, "lastChunk" => 0, "checkpointChunk" => null, "checkpointFrame" => null };
         Storage.setValue(chunkKey(sessionId, 0), []);
         Storage.setValue(SeConstants.INDEX_KEY, index);
         return true;
@@ -34,6 +34,10 @@ class GarminSessionStore {
         if (verified == null || verified.size() != chunk.size() || !_frames.validate(verified[verified.size() - 1])) { return false; }
         metadata["lastChunk"] = chunkNumber;
         metadata["lastSequence"] = frame["sequence"];
+        if (frame["frameType"].equals(SeConstants.FRAME_CHECKPOINT)) {
+            metadata["checkpointChunk"] = chunkNumber;
+            metadata["checkpointFrame"] = chunk.size() - 1;
+        }
         index[sessionId] = metadata;
         Storage.setValue(SeConstants.INDEX_KEY, index);
         return true;
@@ -78,7 +82,7 @@ class GarminSessionStore {
         var keys = index.keys();
         for (var position = 0; position < keys.size(); position += 1) {
             var sessionId = keys[position];
-            if (!validate(sessionId)["integrity"].equals("VALID")) { output.add(sessionId); }
+            if (!index[sessionId]["state"].equals(SeConstants.STATE_COMPLETED) && !validate(sessionId)["integrity"].equals("VALID")) { output.add(sessionId); }
         }
         return output;
     }
@@ -86,13 +90,27 @@ class GarminSessionStore {
     function latestCheckpoint(sessionId) {
         var metadata = readIndex()[sessionId];
         if (metadata == null) { return null; }
-        for (var chunkNumber = metadata["lastChunk"]; chunkNumber >= 0; chunkNumber -= 1) {
+        var checkpointChunk = metadata["checkpointChunk"];
+        var checkpointFrame = metadata["checkpointFrame"];
+        if (checkpointChunk != null && checkpointFrame != null) {
+            var directChunk = Storage.getValue(chunkKey(sessionId, checkpointChunk));
+            if (directChunk == null || checkpointFrame < 0 || checkpointFrame >= directChunk.size()) { return null; }
+            var directFrame = directChunk[checkpointFrame] as Lang.Dictionary;
+            if (_frames.validate(directFrame) && directFrame["frameType"].equals(SeConstants.FRAME_CHECKPOINT)) { return directFrame; }
+            return null;
+        }
+        // Bounded compatibility path for journals created before checkpoint
+        // pointers existed. Inspect frame types and checksum only the candidate.
+        var minimumChunk = metadata["lastChunk"] - SeConstants.MAX_RECOVERY_SCAN_CHUNKS + 1;
+        if (minimumChunk < 0) { minimumChunk = 0; }
+        for (var chunkNumber = metadata["lastChunk"]; chunkNumber >= minimumChunk; chunkNumber -= 1) {
             var chunk = Storage.getValue(chunkKey(sessionId, chunkNumber));
             if (chunk == null) { return null; }
             for (var frameIndex = chunk.size() - 1; frameIndex >= 0; frameIndex -= 1) {
                 var frame = chunk[frameIndex] as Lang.Dictionary;
-                if (!_frames.validate(frame)) { return null; }
-                if (frame["frameType"].equals(SeConstants.FRAME_CHECKPOINT)) { return frame; }
+                if (frame["frameType"].equals(SeConstants.FRAME_CHECKPOINT)) {
+                    return _frames.validate(frame) ? frame : null;
+                }
             }
         }
         return null;

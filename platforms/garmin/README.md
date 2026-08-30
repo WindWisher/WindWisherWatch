@@ -42,7 +42,7 @@ The log is raw research data: do not commit real GPS, HR, or large IMU captures.
 
 No communications, background, FIT/activity recording, health-history, or cloud permissions are requested.
 
-## M2 Session Engine developer harness
+## M2/M3 Session Engine developer harness
 
 `session-engine/` is a separate Connect IQ project named `WW Session Engine Dev`. It exercises the product-core boundaries without turning the M1 Sensor Lab into a product UI.
 
@@ -53,4 +53,4 @@ GARMIN_TARGET_DEVICE=fenix7s ./scripts/build.sh
 ./scripts/test.sh
 ```
 
-Select starts/stops a developer session. A controlled app exit while recording intentionally leaves a recoverable journal; after relaunch, Select explicitly finalizes recovered data. Developer transition logs never include coordinates or heart-rate values.
+Select starts/stops a developer session. A controlled app exit while recording intentionally leaves a recoverable journal; after relaunch, Select explicitly finalizes recovered data. M3 adds developer-only elapsed, current/max speed, distance, HR and GPS-status presentation while retaining SI units in the engine. Developer transition logs never include coordinates or heart-rate values.

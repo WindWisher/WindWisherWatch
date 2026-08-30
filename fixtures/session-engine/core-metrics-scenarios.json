@@ -1,0 +1,78 @@
+{
+  "provenance": "SYNTHETIC_ONLY",
+  "coordinateNotice": "Equatorial test vectors are not user locations.",
+  "scenarios": [
+    {
+      "name": "normal-movement",
+      "positions": [
+        {
+          "relativeMilliseconds": 0,
+          "latitudeDegrees": 0,
+          "longitudeDegrees": 0,
+          "groundSpeedMps": 2,
+          "usable": true
+        },
+        {
+          "relativeMilliseconds": 10000,
+          "latitudeDegrees": 0,
+          "longitudeDegrees": 0.0001,
+          "groundSpeedMps": 4,
+          "usable": true
+        }
+      ],
+      "expected": {
+        "distanceMetersApprox": 11.12,
+        "maximumSpeedMps": 4,
+        "validGpsSampleCount": 2
+      }
+    },
+    {
+      "name": "stationary",
+      "positions": [
+        {
+          "relativeMilliseconds": 0,
+          "latitudeDegrees": 0,
+          "longitudeDegrees": 0,
+          "groundSpeedMps": 0,
+          "usable": true
+        },
+        {
+          "relativeMilliseconds": 1000,
+          "latitudeDegrees": 0,
+          "longitudeDegrees": 0,
+          "groundSpeedMps": 0,
+          "usable": true
+        }
+      ],
+      "expected": {
+        "distanceMetersApprox": 0,
+        "maximumSpeedMps": 0,
+        "validGpsSampleCount": 2
+      }
+    },
+    {
+      "name": "gps-spike",
+      "positions": [
+        {
+          "relativeMilliseconds": 0,
+          "latitudeDegrees": 0,
+          "longitudeDegrees": 0,
+          "groundSpeedMps": 2,
+          "usable": true
+        },
+        {
+          "relativeMilliseconds": 1000,
+          "latitudeDegrees": 0,
+          "longitudeDegrees": 1,
+          "groundSpeedMps": 2,
+          "usable": true
+        }
+      ],
+      "expected": {
+        "distanceMetersApprox": 0,
+        "rejectedSegmentCount": 1,
+        "quality": "GPS_SPIKE"
+      }
+    }
+  ]
+}

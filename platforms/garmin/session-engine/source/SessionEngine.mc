@@ -4,6 +4,7 @@ class SessionEngine {
     private var _store;
     private var _clock;
     private var _frame;
+    private var _metrics;
     private var _state = SeConstants.STATE_IDLE;
     private var _sessionId = null;
     private var _sequence = 0;
@@ -27,6 +28,7 @@ class SessionEngine {
         _store = store;
         _clock = clock;
         _frame = new SeFrame();
+        _metrics = new CoreMetricProjector();
     }
 
     function state() { return _state; }
@@ -55,19 +57,23 @@ class SessionEngine {
         return true;
     }
 
-    function ingestPosition(relativeMilliseconds, latitude, longitude, groundSpeed, quality) {
+    function ingestPosition(relativeMilliseconds, latitude, longitude, groundSpeed, qualityValue, usable) {
         if (!_state.equals(SeConstants.STATE_RECORDING)) { return false; }
         _positionCount += 1;
-        _currentSpeed = groundSpeed;
-        _gpsQuality = quality;
+        var issue = _metrics.ingestPosition(relativeMilliseconds, latitude, longitude, groundSpeed, usable);
+        if (issue != null && !quality(issue)) { return false; }
+        _currentSpeed = _metrics.currentSpeed(relativeMilliseconds);
+        _gpsQuality = qualityValue;
         // Canonical location is durable but never emitted to developer logs.
-        return append(SeConstants.FRAME_POSITION, "t=" + relativeMilliseconds + ";lat=" + latitude + ";lon=" + longitude + ";speed=" + groundSpeed + ";quality=" + quality);
+        return append(SeConstants.FRAME_POSITION, "t=" + relativeMilliseconds + ";lat=" + latitude + ";lon=" + longitude + ";speed=" + nullable(groundSpeed) + ";quality=" + qualityValue + ";usable=" + (usable ? 1 : 0));
     }
 
     function ingestHeartRate(relativeMilliseconds, bpm) {
         if (!_state.equals(SeConstants.STATE_RECORDING)) { return false; }
         _heartRateCount += 1;
-        _heartRate = bpm;
+        var issue = _metrics.ingestHeartRate(relativeMilliseconds, bpm);
+        if (issue != null && !quality(issue)) { return false; }
+        _heartRate = _metrics.currentHeartRate(relativeMilliseconds);
         return append(SeConstants.FRAME_HEART_RATE, "t=" + relativeMilliseconds + ";bpm=" + bpm + ";source=platform");
     }
 
@@ -164,7 +170,7 @@ class SessionEngine {
     }
 
     function checkpointPayload(elapsed) {
-        return "elapsed=" + elapsed + ";pos=" + _positionCount + ";hr=" + _heartRateCount + ";pressure=" + _pressureCount + ";motion=" + _motionCount + ";runtime=" + _runtimeCount + ";quality=" + _qualityCount + ";last=" + _lastPersistedSequence;
+        return "elapsed=" + elapsed + ";pos=" + _positionCount + ";hr=" + _heartRateCount + ";pressure=" + _pressureCount + ";motion=" + _motionCount + ";runtime=" + _runtimeCount + ";quality=" + _qualityCount + ";last=" + _lastPersistedSequence + ";dist=" + _metrics.distance() + ";max=" + nullable(_metrics.maximumSpeed()) + ";spd=" + nullable(_metrics.latestSpeed()) + ";st=" + nullable(_metrics.speedTime()) + ";plat=" + nullable(_metrics.latitude()) + ";plon=" + nullable(_metrics.longitude()) + ";pt=" + nullable(_metrics.positionTime()) + ";hrv=" + nullable(_metrics.heartRate()) + ";hrt=" + nullable(_metrics.heartRateTime()) + ";vgps=" + _metrics.validGpsCount() + ";rej=" + _metrics.rejectedSegmentCount() + ";igps=" + _metrics.invalidGpsCount() + ";ihr=" + _metrics.invalidHeartRateCount();
     }
 
     function parseCheckpoint(payload) {
@@ -175,6 +181,21 @@ class SessionEngine {
         _motionCount = fieldNumber(payload, "motion", _motionCount);
         _runtimeCount = fieldNumber(payload, "runtime", _runtimeCount);
         _qualityCount = fieldNumber(payload, "quality", _qualityCount);
+        _metrics.restore(
+            fieldFloat(payload, "dist", _metrics.distance()),
+            fieldNullableNumber(payload, "max", _metrics.maximumSpeed()),
+            fieldNullableNumber(payload, "spd", _metrics.latestSpeed()),
+            fieldNullableNumber(payload, "st", _metrics.speedTime()),
+            fieldNullableNumber(payload, "plat", _metrics.latitude()),
+            fieldNullableNumber(payload, "plon", _metrics.longitude()),
+            fieldNullableNumber(payload, "pt", _metrics.positionTime()),
+            fieldNullableNumber(payload, "hrv", _metrics.heartRate()),
+            fieldNullableNumber(payload, "hrt", _metrics.heartRateTime()),
+            fieldNumber(payload, "vgps", _metrics.validGpsCount()),
+            fieldNumber(payload, "rej", _metrics.rejectedSegmentCount()),
+            fieldNumber(payload, "igps", _metrics.invalidGpsCount()),
+            fieldNumber(payload, "ihr", _metrics.invalidHeartRateCount())
+        );
     }
 
     function fieldNumber(payload, name, fallback) {
@@ -188,6 +209,32 @@ class SessionEngine {
         return value == null ? fallback : value;
     }
 
+    function fieldFloat(payload, name, fallback) {
+        var text = fieldText(payload, name);
+        if (text == null || text.equals("-")) { return fallback; }
+        var value = text.toFloat();
+        return value == null ? fallback : value;
+    }
+
+    function fieldNullableNumber(payload, name, fallback) {
+        var text = fieldText(payload, name);
+        if (text == null) { return fallback; }
+        if (text.equals("-")) { return null; }
+        var value = text.toFloat();
+        return value == null ? fallback : value;
+    }
+
+    function fieldText(payload, name) {
+        var marker = name + "=";
+        var start = payload.find(marker);
+        if (start == null) { return null; }
+        var tail = payload.substring(start + marker.length(), payload.length());
+        var delimiter = tail.find(";");
+        return delimiter == null ? tail : tail.substring(0, delimiter);
+    }
+
+    function nullable(value) { return value == null ? "-" : value; }
+
     function fail(code) {
         _state = SeConstants.STATE_FAILED;
         _lastQuality = code;
@@ -195,13 +242,24 @@ class SessionEngine {
     }
 
     function liveState() {
+        var elapsed = elapsedMilliseconds();
         return {
             "sessionId" => _sessionId,
             "state" => _state,
-            "elapsedMilliseconds" => elapsedMilliseconds(),
-            "currentSpeedMps" => _currentSpeed,
-            "heartRate" => _heartRate,
+            "elapsedMilliseconds" => elapsed,
+            "wallClockEpochSeconds" => _clock.epochSeconds(),
+            "currentSpeedMps" => _metrics.currentSpeed(elapsed),
+            "maximumSpeedMps" => _metrics.maximumSpeed(),
+            "distanceMeters" => _metrics.distance(),
+            "heartRate" => _metrics.currentHeartRate(elapsed),
             "gpsQuality" => _gpsQuality,
+            "gpsStatus" => _metrics.gpsStatus(elapsed),
+            "heartRateStatus" => _metrics.heartRateStatus(elapsed),
+            "validGpsSampleCount" => _metrics.validGpsCount(),
+            "rejectedSegmentCount" => _metrics.rejectedSegmentCount(),
+            "recordingHealth" => _state.equals(SeConstants.STATE_FAILED) ? "FAILED" : "AVAILABLE",
+            "persistenceHealth" => _state.equals(SeConstants.STATE_FAILED) ? "DEGRADED" : "VALID",
+            "qualitySummary" => _qualityCount > 0 ? "DEGRADED" : "VALID",
             "positionCount" => _positionCount,
             "heartRateCount" => _heartRateCount,
             "pressureCount" => _pressureCount,

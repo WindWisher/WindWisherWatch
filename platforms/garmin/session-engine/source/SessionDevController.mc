@@ -67,8 +67,8 @@ class SessionDevController {
         WatchUi.requestUpdate();
     }
 
-    function position(latitude, longitude, speed, qualityValue) {
-        _engine.ingestPosition(_engine.elapsedMilliseconds(), latitude, longitude, speed, qualityValue);
+    function position(latitude, longitude, speed, qualityValue, usable) {
+        _engine.ingestPosition(_engine.elapsedMilliseconds(), latitude, longitude, speed, qualityValue, usable);
     }
 
     function heartRate(bpm) { _engine.ingestHeartRate(_engine.elapsedMilliseconds(), bpm); }
