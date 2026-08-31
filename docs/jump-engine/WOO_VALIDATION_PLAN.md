@@ -6,4 +6,4 @@ A future reference record may contain `referenceId`, reference timestamp, option
 
 M6 must predeclare precision, recall, false positives, false negatives, temporal offset and airtime MAE. Height MAE/RMSE is relevant only if a separately justified height estimator exists. Evaluation must segment scenario/device/profile cohorts and retain unmatched records rather than forcing matches.
 
-Current gate is `M6_WOO_VALIDATION_GATE = NO_GO`: synthetic stability is insufficient without controlled hardware evidence and a preliminary MEDIUM/HIGH signal comparison.
+Current gate is `M6_WOO_VALIDATION_GATE = NO_GO`. Controlled hardware evidence now exists and selects MEDIUM for continued research, but J5 MEDIUM produced a confirmed false positive, J3/J4 airtimes remain unvalidated, and raw-window replay is incomplete. M6 must not begin until a versioned hypothesis resolves those blockers and repeats the affected controls without erasing this baseline.

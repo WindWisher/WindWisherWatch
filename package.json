@@ -15,11 +15,13 @@
     "guard:session-engine": "node tools/session-engine/source-guards.mjs",
     "inspect:canonical": "node tools/session-engine/canonical-export/inspect.mjs",
     "inspect:jump-research": "node tools/jump-engine/inspect.mjs",
+    "inspect:garmin-jump-capture": "node tools/jump-engine/inspect-garmin.mjs",
     "guard:jump-engine": "node tools/jump-engine/source-guards.mjs",
+    "guard:garmin-jump-research": "node tools/jump-engine/garmin-source-guards.mjs",
     "test": "node --test tools/contracts/*.test.mjs tools/garmin-sensor-lab/*.test.mjs tools/jump-engine/*.test.mjs tools/session-engine/*.test.mjs tools/session-engine/canonical-export/*.test.mjs",
     "lint": "eslint tools --max-warnings=0",
     "format:check": "prettier --check .",
-    "check": "npm run format:check && npm run lint && npm test && npm run validate:contracts && npm run validate:garmin-lab && npm run validate:session-engine && npm run guard:garmin-source && npm run guard:session-engine && npm run guard:jump-engine"
+    "check": "npm run format:check && npm run lint && npm test && npm run validate:contracts && npm run validate:garmin-lab && npm run validate:session-engine && npm run guard:garmin-source && npm run guard:session-engine && npm run guard:jump-engine && npm run guard:garmin-jump-research"
   },
   "devDependencies": {
     "ajv": "8.20.0",

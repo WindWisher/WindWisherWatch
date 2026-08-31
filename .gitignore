@@ -12,4 +12,5 @@ research/garmin/results/*
 !research/garmin/results/README.md
 .env
 .env.*
+research/garmin/jump-engine/results/
 !.env.example
