@@ -89,6 +89,83 @@
         { "durationMilliseconds": 1000, "accelPatternMps2": [9.80665] }
       ],
       "expectedConfirmed": 0
+    },
+    {
+      "id": "j5-arm-motion-structural-hypothesis-v1",
+      "evidenceBasis": "SYNTHETIC_HYPOTHESIS_NOT_HARDWARE_DERIVATIVE",
+      "datasetRole": "TUNING",
+      "segments": [
+        { "durationMilliseconds": 1000, "accelPatternMps2": [9.80665] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [18] },
+        { "durationMilliseconds": 120, "accelPatternMps2": [2] },
+        { "durationMilliseconds": 400, "accelPatternMps2": [10.5, 12] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [21] },
+        { "durationMilliseconds": 1400, "accelPatternMps2": [14, 16, 13.5] }
+      ],
+      "expectedConfirmed": 0
+    },
+    {
+      "id": "j3-high-boundary-hypothesis-v1",
+      "evidenceBasis": "SYNTHETIC_SAMPLE_RATE_HYPOTHESIS_NOT_HARDWARE_DERIVATIVE",
+      "datasetRole": "STATE_MACHINE_CONTROL",
+      "segments": [
+        { "durationMilliseconds": 1000, "accelPatternMps2": [9.80665] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [16, 18] },
+        { "durationMilliseconds": 360, "accelPatternMps2": [4.5, 5.5] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [18, 20] },
+        { "durationMilliseconds": 1400, "accelPatternMps2": [9.80665] }
+      ],
+      "expectedConfirmed": 1
+    },
+    {
+      "id": "j4-three-separated-controlled-hop-structure",
+      "evidenceBasis": "SYNTHETIC_COUNT_INVARIANT_ONLY",
+      "datasetRole": "STATE_MACHINE_CONTROL",
+      "segments": [
+        { "durationMilliseconds": 1000, "accelPatternMps2": [9.80665] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [18] },
+        { "durationMilliseconds": 400, "accelPatternMps2": [3.2] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [22] },
+        { "durationMilliseconds": 1400, "accelPatternMps2": [9.80665] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [18] },
+        { "durationMilliseconds": 440, "accelPatternMps2": [3.2] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [22] },
+        { "durationMilliseconds": 1400, "accelPatternMps2": [9.80665] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [18] },
+        { "durationMilliseconds": 480, "accelPatternMps2": [3.2] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [22] },
+        { "durationMilliseconds": 1400, "accelPatternMps2": [9.80665] }
+      ],
+      "expectedConfirmed": 3
+    },
+    {
+      "id": "holdout-double-impact-no-flight",
+      "evidenceBasis": "SYNTHETIC_HOLDOUT",
+      "datasetRole": "HOLDOUT",
+      "segments": [
+        { "durationMilliseconds": 1000, "accelPatternMps2": [9.80665] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [20] },
+        { "durationMilliseconds": 320, "accelPatternMps2": [8.5, 10.5] },
+        { "durationMilliseconds": 80, "accelPatternMps2": [19] },
+        { "durationMilliseconds": 1400, "accelPatternMps2": [9.80665] }
+      ],
+      "expectedConfirmed": 0
+    },
+    {
+      "id": "arm-direction-discrimination-hypothesis-v1",
+      "evidenceBasis": "SANITIZED_AGGREGATE_HYPOTHESIS_FROM_J5_DIAGNOSTIC",
+      "datasetRole": "TUNING",
+      "segments": [
+        { "durationMilliseconds": 1000, "accelPatternMps2": [9.80665] },
+        { "durationMilliseconds": 80, "accelVectorPatternMps2": [[18, 0, 0]] },
+        { "durationMilliseconds": 360, "accelPatternMps2": [3] },
+        {
+          "durationMilliseconds": 80,
+          "accelVectorPatternMps2": [[15, 13.2, 0]]
+        },
+        { "durationMilliseconds": 1400, "accelPatternMps2": [9.80665] }
+      ],
+      "expectedConfirmed": 0
     }
   ]
 }

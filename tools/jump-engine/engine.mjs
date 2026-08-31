@@ -6,6 +6,7 @@ import {
   GyroQuality,
   JumpState,
   QualityFlag,
+  ReasonCode,
 } from "./model.mjs";
 import { FixedRingBuffer } from "./ring-buffer.mjs";
 import { TimestampNormalizer } from "./timestamp-normalizer.mjs";
@@ -14,6 +15,27 @@ function addBoundedFlag(active, flag, limit) {
   if (!active || active.flags.includes(flag) || active.flags.length >= limit)
     return;
   active.flags.push(flag);
+}
+
+function addBoundedReason(active, reason, limit) {
+  if (
+    !active ||
+    active.reasons.includes(reason) ||
+    active.reasons.length >= limit
+  )
+    return;
+  active.reasons.push(reason);
+}
+
+function vectorCosine(first, second) {
+  if (!first || !second) return null;
+  const denominator =
+    Math.hypot(first.x, first.y, first.z) *
+    Math.hypot(second.x, second.y, second.z);
+  if (denominator === 0) return null;
+  return (
+    (first.x * second.x + first.y * second.y + first.z * second.z) / denominator
+  );
 }
 
 export class ExperimentalJumpEngine {
@@ -69,6 +91,7 @@ export class ExperimentalJumpEngine {
       sequence: sample.sequence,
       timestamp,
       accelMagnitude,
+      accel: sample.accel,
       smoothedAccelMagnitude,
       gyro,
       ...(Number.isFinite(sample.pressurePascals)
@@ -95,6 +118,12 @@ export class ExperimentalJumpEngine {
           QualityFlag.GYRO_OUTLIER,
           this.config.notableFlagLimit,
         );
+      if (gyro.quality === GyroQuality.INVALID_OUTLIER_CANDIDATE)
+        addBoundedReason(
+          this.active,
+          ReasonCode.GYRO_CORRUPTED,
+          this.config.notableFlagLimit,
+        );
     }
     return this.advance(observation);
   }
@@ -107,12 +136,20 @@ export class ExperimentalJumpEngine {
           candidateId: `${this.sessionId}:${this.config.algorithmVersion}:${String(this.candidateSequence).padStart(6, "0")}`,
           candidateSequence: this.candidateSequence,
           impulseTime: time,
+          candidateStartTime: time,
+          flightStartTime: null,
+          lowGLastTime: null,
+          lowGStreakStartTime: null,
+          maximumSustainedLowGMilliseconds: 0,
           takeoffTime: null,
           landingTime: null,
           landingStable: false,
           peakAccelMps2: observation.accelMagnitude,
+          takeoffImpulseVector: structuredClone(observation.accel),
+          landingImpulseVector: null,
           minimumFlightAccelMps2: observation.accelMagnitude,
           flags: [...observation.timestamp.qualityFlags],
+          reasons: [ReasonCode.TAKEOFF_IMPULSE_FOUND],
           window: this.rolling.snapshot(),
           gyroPlausibleSamples:
             observation.gyro.quality === GyroQuality.PLAUSIBLE ? 1 : 0,
@@ -128,6 +165,18 @@ export class ExperimentalJumpEngine {
           addBoundedFlag(
             this.active,
             QualityFlag.GYRO_OUTLIER,
+            this.config.notableFlagLimit,
+          );
+        if (this.active.gyroOutlierSamples > 0)
+          addBoundedReason(
+            this.active,
+            ReasonCode.GYRO_CORRUPTED,
+            this.config.notableFlagLimit,
+          );
+        if (observation.timestamp.qualityFlags.length > 0)
+          addBoundedReason(
+            this.active,
+            ReasonCode.TIMESTAMP_DEGRADED,
             this.config.notableFlagLimit,
           );
         this.candidateSequence += 1;
@@ -150,10 +199,29 @@ export class ExperimentalJumpEngine {
       this.active.gyroOutlierSamples += 1;
 
     if (this.state === JumpState.POSSIBLE_TAKEOFF) {
-      if (observation.smoothedAccelMagnitude <= this.config.lowGEnterMps2) {
-        this.active.takeoffTime = this.active.impulseTime;
-        this.active.minimumFlightAccelMps2 = observation.smoothedAccelMagnitude;
-        this.state = JumpState.FLIGHT;
+      if (
+        time - this.active.candidateStartTime >
+        this.config.maximumTakeoffCandidateMilliseconds
+      ) {
+        addBoundedFlag(
+          this.active,
+          QualityFlag.TAKEOFF_AMBIGUOUS,
+          this.config.notableFlagLimit,
+        );
+        addBoundedReason(
+          this.active,
+          ReasonCode.NO_FLIGHT_PHASE,
+          this.config.notableFlagLimit,
+        );
+        return this.finish(CandidateStatus.REJECTED, time);
+      } else if (observation.accelMagnitude >= this.config.takeoffImpulseMps2) {
+        this.active.impulseTime = time;
+        this.active.takeoffImpulseVector = structuredClone(observation.accel);
+        addBoundedReason(
+          this.active,
+          ReasonCode.TAKEOFF_IMPULSE_UPDATED,
+          this.config.notableFlagLimit,
+        );
       } else if (
         time - this.active.impulseTime >
         this.config.takeoffToLowGMaximumMilliseconds
@@ -163,7 +231,31 @@ export class ExperimentalJumpEngine {
           QualityFlag.TAKEOFF_AMBIGUOUS,
           this.config.notableFlagLimit,
         );
+        addBoundedReason(
+          this.active,
+          ReasonCode.NO_FLIGHT_PHASE,
+          this.config.notableFlagLimit,
+        );
+        addBoundedReason(
+          this.active,
+          ReasonCode.IMPACT_ONLY,
+          this.config.notableFlagLimit,
+        );
         return this.finish(CandidateStatus.REJECTED, time);
+      } else if (
+        observation.smoothedAccelMagnitude <= this.config.lowGEnterMps2
+      ) {
+        this.active.takeoffTime = time;
+        this.active.flightStartTime = time;
+        this.active.lowGLastTime = time;
+        this.active.lowGStreakStartTime = time;
+        this.active.minimumFlightAccelMps2 = observation.smoothedAccelMagnitude;
+        addBoundedReason(
+          this.active,
+          ReasonCode.LOW_G_PHASE_FOUND,
+          this.config.notableFlagLimit,
+        );
+        this.state = JumpState.FLIGHT;
       }
       return null;
     }
@@ -173,6 +265,15 @@ export class ExperimentalJumpEngine {
         this.active.minimumFlightAccelMps2,
         observation.smoothedAccelMagnitude,
       );
+      if (observation.smoothedAccelMagnitude <= this.config.lowGEnterMps2) {
+        if (this.active.lowGStreakStartTime === null)
+          this.active.lowGStreakStartTime = time;
+        this.active.lowGLastTime = time;
+        this.active.maximumSustainedLowGMilliseconds = Math.max(
+          this.active.maximumSustainedLowGMilliseconds,
+          time - this.active.lowGStreakStartTime,
+        );
+      } else this.active.lowGStreakStartTime = null;
       const duration = time - this.active.takeoffTime;
       if (duration > this.config.maximumFlightMilliseconds) {
         addBoundedFlag(
@@ -184,10 +285,68 @@ export class ExperimentalJumpEngine {
       }
       if (observation.accelMagnitude >= this.config.landingImpulseMps2) {
         this.active.landingTime = time;
+        this.active.landingImpulseVector = structuredClone(observation.accel);
+        const directionCosine = vectorCosine(
+          this.active.takeoffImpulseVector,
+          this.active.landingImpulseVector,
+        );
+        this.active.takeoffLandingDirectionCosine = directionCosine;
+        if (
+          directionCosine !== null &&
+          directionCosine < this.config.minimumTakeoffLandingDirectionCosine
+        ) {
+          addBoundedFlag(
+            this.active,
+            QualityFlag.ARM_MOTION_PATTERN,
+            this.config.notableFlagLimit,
+          );
+          addBoundedReason(
+            this.active,
+            ReasonCode.ARM_MOTION_PATTERN,
+            this.config.notableFlagLimit,
+          );
+        } else if (directionCosine !== null)
+          addBoundedReason(
+            this.active,
+            ReasonCode.IMPULSE_DIRECTION_CONSISTENT,
+            this.config.notableFlagLimit,
+          );
+        addBoundedReason(
+          this.active,
+          ReasonCode.LANDING_IMPULSE_FOUND,
+          this.config.notableFlagLimit,
+        );
         if (duration < this.config.minimumFlightMilliseconds)
           addBoundedFlag(
             this.active,
             QualityFlag.SHORT_FLIGHT,
+            this.config.notableFlagLimit,
+          );
+        if (
+          this.active.maximumSustainedLowGMilliseconds <
+          this.config.minimumSustainedLowGMilliseconds
+        ) {
+          addBoundedFlag(
+            this.active,
+            QualityFlag.SHORT_FLIGHT,
+            this.config.notableFlagLimit,
+          );
+          addBoundedReason(
+            this.active,
+            ReasonCode.LOW_G_TOO_BRIEF,
+            this.config.notableFlagLimit,
+          );
+        } else {
+          addBoundedReason(
+            this.active,
+            ReasonCode.LOW_G_DURATION_PLAUSIBLE,
+            this.config.notableFlagLimit,
+          );
+        }
+        if (duration >= this.config.minimumFlightMilliseconds)
+          addBoundedReason(
+            this.active,
+            ReasonCode.FLIGHT_DURATION_PLAUSIBLE,
             this.config.notableFlagLimit,
           );
         this.state = JumpState.POSSIBLE_LANDING;
@@ -200,8 +359,14 @@ export class ExperimentalJumpEngine {
       observation.smoothedAccelMagnitude <= this.config.groundedMaximumMps2 &&
       time - this.active.landingTime >=
         this.config.landingStabilizationMilliseconds
-    )
+    ) {
       this.active.landingStable = true;
+      addBoundedReason(
+        this.active,
+        ReasonCode.LANDING_STABLE,
+        this.config.notableFlagLimit,
+      );
+    }
     if (time - this.active.landingTime >= this.config.postEventSeconds * 1000) {
       if (!this.active.landingStable)
         addBoundedFlag(
@@ -209,7 +374,16 @@ export class ExperimentalJumpEngine {
           QualityFlag.LANDING_AMBIGUOUS,
           this.config.notableFlagLimit,
         );
-      const rejected = this.active.flags.includes(QualityFlag.SHORT_FLIGHT);
+      if (!this.active.landingStable)
+        addBoundedReason(
+          this.active,
+          ReasonCode.LANDING_NOT_STABLE,
+          this.config.notableFlagLimit,
+        );
+      const rejected =
+        this.active.flags.includes(QualityFlag.SHORT_FLIGHT) ||
+        this.active.flags.includes(QualityFlag.ARM_MOTION_PATTERN) ||
+        !this.active.landingStable;
       return this.finish(
         rejected ? CandidateStatus.REJECTED : CandidateStatus.CONFIRMED,
         time,
@@ -258,6 +432,41 @@ export class ExperimentalJumpEngine {
       sensorProfile: this.config.profile,
       confidence,
       qualityFlags: Object.freeze([...active.flags]),
+      reasonCodes: Object.freeze([...active.reasons]),
+      evidence: Object.freeze({
+        takeoffEvidence: Object.freeze({
+          impulseFound: active.reasons.includes(
+            ReasonCode.TAKEOFF_IMPULSE_FOUND,
+          ),
+          impulseToFlightMilliseconds:
+            active.flightStartTime === null
+              ? null
+              : active.flightStartTime - active.impulseTime,
+          candidateToFlightMilliseconds:
+            active.flightStartTime === null
+              ? null
+              : active.flightStartTime - active.candidateStartTime,
+        }),
+        flightEvidence: Object.freeze({
+          lowGFound: active.reasons.includes(ReasonCode.LOW_G_PHASE_FOUND),
+          sustainedLowGMilliseconds: active.maximumSustainedLowGMilliseconds,
+          flightToLandingMilliseconds: airtimeMilliseconds,
+        }),
+        landingEvidence: Object.freeze({
+          impulseFound: active.reasons.includes(
+            ReasonCode.LANDING_IMPULSE_FOUND,
+          ),
+          stable: active.landingStable,
+          takeoffLandingDirectionCosine: vectorCosine(
+            active.takeoffImpulseVector,
+            active.landingImpulseVector,
+          ),
+        }),
+        gyroEvidence: Object.freeze({
+          plausibleSamples: active.gyroPlausibleSamples,
+          outlierSamples: active.gyroOutlierSamples,
+        }),
+      }),
       featureSummary: Object.freeze({
         peakAccelMps2: active.peakAccelMps2,
         minimumFlightAccelMps2: active.minimumFlightAccelMps2,
@@ -281,8 +490,12 @@ export class ExperimentalJumpEngine {
     if (status === CandidateStatus.CONFIRMED)
       this.totalConfirmedCandidates += 1;
     else this.totalRejectedCandidates += 1;
-    if (this.candidates.length > this.config.retainedCandidateLimit)
-      this.candidates.shift();
+    if (this.candidates.length > this.config.retainedCandidateLimit) {
+      const rejectedIndex = this.candidates.findIndex(
+        (retained) => retained.status === CandidateStatus.REJECTED,
+      );
+      this.candidates.splice(rejectedIndex >= 0 ? rejectedIndex : 0, 1);
+    }
     this.active = null;
     this.state = JumpState.GROUND;
     return candidate;
@@ -293,6 +506,11 @@ export class ExperimentalJumpEngine {
     addBoundedFlag(
       this.active,
       QualityFlag.SESSION_ENDED,
+      this.config.notableFlagLimit,
+    );
+    addBoundedReason(
+      this.active,
+      ReasonCode.SESSION_ENDED,
       this.config.notableFlagLimit,
     );
     if (this.active.takeoffTime === null)

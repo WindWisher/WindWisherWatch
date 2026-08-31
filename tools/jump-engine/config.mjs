@@ -1,5 +1,5 @@
 const base = Object.freeze({
-  algorithmVersion: "experimental-0.1-medium",
+  algorithmVersion: "experimental-0.2-discrimination",
   profile: "MEDIUM",
   sampleRateHz: 25,
   gravityMps2: 9.80665,
@@ -9,8 +9,11 @@ const base = Object.freeze({
   groundedMinimumMps2: 7,
   groundedMaximumMps2: 13,
   landingImpulseMps2: 15,
+  minimumTakeoffLandingDirectionCosine: 0.9,
   takeoffToLowGMaximumMilliseconds: 360,
+  maximumTakeoffCandidateMilliseconds: 1000,
   minimumFlightMilliseconds: 240,
+  minimumSustainedLowGMilliseconds: 120,
   maximumFlightMilliseconds: 3000,
   landingStabilizationMilliseconds: 160,
   sampleGapMultiplier: 3,
@@ -26,7 +29,7 @@ export const ExperimentalProfiles = Object.freeze({
   MEDIUM: base,
   HIGH: Object.freeze({
     ...base,
-    algorithmVersion: "experimental-0.1-high",
+    algorithmVersion: "experimental-0.2-discrimination",
     profile: "HIGH",
     sampleRateHz: 50,
     smoothingSamples: 5,

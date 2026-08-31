@@ -30,14 +30,20 @@ export function generateScenario(catalog, id, profile = "MEDIUM") {
       let rawSampleTimestamp = callbackTimestamp;
       if (sequence === scenario.duplicateRawTimestampAtSample)
         rawSampleTimestamp = samples.at(-1).rawSampleTimestamp;
-      const accel =
-        segment.accelPatternMps2[index % segment.accelPatternMps2.length];
+      const accel = segment.accelPatternMps2
+        ? segment.accelPatternMps2[index % segment.accelPatternMps2.length]
+        : null;
+      const accelVector = segment.accelVectorPatternMps2
+        ? segment.accelVectorPatternMps2[
+            index % segment.accelVectorPatternMps2.length
+          ]
+        : [accel, 0, 0];
       const outlier = sequence === scenario.gyroOutlierAtSample;
       samples.push({
         sequence,
         rawSampleTimestamp,
         callbackTimestamp,
-        accel: { x: accel, y: 0, z: 0 },
+        accel: { x: accelVector[0], y: accelVector[1], z: accelVector[2] },
         gyro: outlier ? { x: 32764, y: -16296, z: 0 } : { x: 20, y: 10, z: 5 },
       });
       sequence += 1;

@@ -48,9 +48,10 @@ for (const requiredMarker of [
   "FixedRingBuffer",
   "retainedCandidateLimit",
   "activeWindowCapacity",
-  "experimental-0.1",
+  "experimental-0.2-discrimination",
   "GYRO_OUTLIER",
   "TIMESTAMP_DEGRADED",
+  "ARM_MOTION_PATTERN",
 ])
   if (!source.includes(requiredMarker))
     throw new Error(

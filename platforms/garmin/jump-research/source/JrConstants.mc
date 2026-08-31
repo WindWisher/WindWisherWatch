@@ -1,7 +1,7 @@
 module JrConstants {
-    const APP_VERSION = "0.1.0-m5.1";
+    const APP_VERSION = "0.2.0-m5.2";
     const SCHEMA_VERSION = "1.0.0";
-    const ALGORITHM_VERSION = "experimental-0.1-hardware-observer";
+    const ALGORITHM_VERSION = "experimental-0.2-discrimination-observer";
     const PROFILE_VERSION = "garmin-research-0.1";
     const LOG_PREFIX = "WWJUMP|";
 
@@ -32,4 +32,22 @@ module JrConstants {
     const FLAG_TIMESTAMP_DEGRADED = 1;
     const FLAG_GYRO_OUTLIER = 2;
     const FLAG_SAMPLE_GAP = 4;
+    const FLAG_ARM_MOTION_PATTERN = 8;
+
+    const REASON_TAKEOFF_IMPULSE_FOUND = 1;
+    const REASON_LOW_G_PHASE_FOUND = 2;
+    const REASON_LOW_G_DURATION_PLAUSIBLE = 4;
+    const REASON_LOW_G_TOO_BRIEF = 8;
+    const REASON_LANDING_IMPULSE_FOUND = 16;
+    const REASON_LANDING_STABLE = 32;
+    const REASON_LANDING_NOT_STABLE = 64;
+    const REASON_FLIGHT_DURATION_PLAUSIBLE = 128;
+    const REASON_NO_FLIGHT_PHASE = 256;
+    const REASON_IMPACT_ONLY = 512;
+    const REASON_GYRO_CORRUPTED = 1024;
+    const REASON_TIMESTAMP_DEGRADED = 2048;
+    const REASON_SESSION_ENDED = 4096;
+    const REASON_TAKEOFF_IMPULSE_UPDATED = 8192;
+    const REASON_IMPULSE_DIRECTION_CONSISTENT = 16384;
+    const REASON_ARM_MOTION_PATTERN = 32768;
 }

@@ -5,7 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { ExperimentalJumpEngine } from "./engine.mjs";
 import { generateScenario, loadScenarioCatalog } from "./fixtures.mjs";
-import { CandidateStatus, QualityFlag } from "./model.mjs";
+import { CandidateStatus, QualityFlag, ReasonCode } from "./model.mjs";
 import { replaySamples } from "./replay.mjs";
 
 const root = path.resolve(
@@ -62,6 +62,93 @@ test("gyro outliers remain flagged and do not create or invalidate a jump", () =
     result.candidates[0].qualityFlags.includes(QualityFlag.GYRO_OUTLIER),
   );
   assert.equal(result.candidates[0].confidence, "MEDIUM");
+});
+
+test("ACCEL_ONLY and valid gyro preserve the same base classification", () => {
+  const samples = generated("clean-synthetic-jump").samples;
+  const withGyro = replaySamples(samples, { sessionId: "valid-gyro" });
+  const accelOnly = replaySamples(
+    samples.map((sample) => {
+      const accelSample = structuredClone(sample);
+      delete accelSample.gyro;
+      return accelSample;
+    }),
+    { sessionId: "accel-only" },
+  );
+  assert.equal(withGyro.engine.confirmedCandidates, 1);
+  assert.equal(accelOnly.engine.confirmedCandidates, 1);
+  assert.equal(
+    withGyro.candidates[0].experimentalAirtimeMilliseconds,
+    accelOnly.candidates[0].experimentalAirtimeMilliseconds,
+  );
+});
+
+test("artifact-heavy gyro is quality evidence and never a required phase", () => {
+  const samples = generated("clean-synthetic-jump").samples.map(
+    (sample, index) => ({
+      ...sample,
+      gyro:
+        index >= 25 && index <= 55
+          ? { x: 32764, y: -16296, z: 0 }
+          : sample.gyro,
+    }),
+  );
+  const result = replaySamples(samples, { sessionId: "artifact-heavy" });
+  assert.equal(result.engine.confirmedCandidates, 1);
+  assert.ok(
+    result.candidates[0].qualityFlags.includes(QualityFlag.GYRO_OUTLIER),
+  );
+  assert.ok(result.candidates[0].evidence.gyroEvidence.outlierSamples > 0);
+});
+
+test("J5 structural hypothesis is rejected for missing sustained flight and stable landing", () => {
+  const result = replaySamples(
+    generated("j5-arm-motion-structural-hypothesis-v1").samples,
+    { sessionId: "j5-structural-hypothesis" },
+  );
+  assert.equal(result.engine.confirmedCandidates, 0);
+  assert.ok(
+    result.candidates.some((candidate) =>
+      candidate.reasonCodes.includes(ReasonCode.LOW_G_TOO_BRIEF),
+    ),
+  );
+});
+
+test("directional arm-motion hypothesis is rejected with a typed reason", () => {
+  const result = replaySamples(
+    generated("arm-direction-discrimination-hypothesis-v1").samples,
+    { sessionId: "arm-direction-hypothesis" },
+  );
+  assert.equal(result.engine.confirmedCandidates, 0);
+  assert.ok(
+    result.candidates.some((candidate) =>
+      candidate.reasonCodes.includes(ReasonCode.ARM_MOTION_PATTERN),
+    ),
+  );
+});
+
+test("J3 HIGH boundary hypothesis has time-equivalent classification", () => {
+  for (const profile of ["MEDIUM", "HIGH"]) {
+    const result = replaySamples(
+      generated("j3-high-boundary-hypothesis-v1", profile).samples,
+      { sessionId: `j3-boundary-${profile}`, profile },
+    );
+    assert.equal(result.engine.confirmedCandidates, 1, profile);
+    assert.ok(
+      result.candidates[0].reasonCodes.includes(
+        ReasonCode.LOW_G_DURATION_PLAUSIBLE,
+      ),
+    );
+  }
+});
+
+test("J4 separation invariant retains three confirmed candidates", () => {
+  const result = replaySamples(
+    generated("j4-three-separated-controlled-hop-structure").samples,
+    { sessionId: "j4-separation" },
+  );
+  assert.equal(result.engine.confirmedCandidates, 3);
+  assert.equal(result.engine.rejectedCandidates, 0);
 });
 
 test("pressure and speed remain optional context, never primary timing", () => {

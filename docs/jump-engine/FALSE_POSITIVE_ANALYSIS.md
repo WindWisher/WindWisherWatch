@@ -1,5 +1,13 @@
 # Controlled false-positive analysis
 
+## M5.2 update
+
+The historical J5 event was outside the retained raw prefix, so its exact trace is not recoverable. M5.2 reproduced recurrent J5-class false confirmations after adding bounded candidate traces. The original code accepted an impulse, one low-g crossing and a later impact; flight started at the first impulse and Garmin did not require landing stabilization.
+
+After correcting those defects, a complete J5 false candidate showed 160 ms consecutive low-g, 240 ms flight, stable landing and direction cosine 0.757. Direction coherence rejected this class while preserving controlled hops at 0.948–0.998.
+
+The discriminator did not generalize to brisk walking. Frozen N5 holdout produced three false confirmations with 248–288 ms flight and direction cosine 0.934–0.988, overlapping controlled positives. The blocker is `FALSE_POSITIVE_DISCRIMINATION_BRISK_WALKING`.
+
 The critical M5.1 outcome is the number of confirmed candidates in negative protocols:
 
 ```text

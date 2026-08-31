@@ -1,5 +1,13 @@
 # M5.1 gyro hardware findings
 
+## M5.2 provisional role
+
+`GYRO_ROLE = QUALITY_ONLY`.
+
+The detector remains accel-only. Invalid gyro is excluded from valid aggregates, flagged, retained raw only in ignored captures and never clamped. Synthetic valid/artifact-heavy gyro variants preserve classification.
+
+M5.2 again found motion-dependent artifacts: N0 had 0/725 outliers; N1 619/725; N2 660/725; N4 364/725; N5 506/725. A reproduced J5 false candidate had 0 valid and 50 outlier samples, while controlled hops generally retained valid samples. This is quality evidence, not a safe dependency, because the values remain physically implausible and their batch origin is unresolved.
+
 M1.1-B observed implausible values around 14,071–32,764 degrees/second. Cause remains `UNKNOWN`.
 
 M5.1 preserves every captured gyro vector and raw gyro timestamp. Any axis at or beyond 3,000 degrees/second sets the bitmask `GYRO_OUTLIER`; aggregate occurrence is reported without clamp. Sequence, relative/raw time and candidate context can be inspected temporarily in the ignored raw capture. The bounded ring naturally supplies nearby samples, but no raw excerpt enters Git by default.

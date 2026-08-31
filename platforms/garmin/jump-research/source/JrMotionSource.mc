@@ -13,7 +13,7 @@ class JrMotionSource {
     private var _lastNormalizedTimestamp = null;
     private var _expectedInterval = 40;
     private var _captureFrozen = false;
-    private var _postCandidateRemaining = 0;
+    private var _postCandidateUntil = null;
     private var _limitReached = false;
 
     function initialize(profile, mode, rate) {
@@ -83,15 +83,17 @@ class JrMotionSource {
             var gx = (gyro == null || index >= gyro.x.size()) ? null : gyro.x[index];
             var gy = (gyro == null || index >= gyro.y.size()) ? null : gyro.y[index];
             var gz = (gyro == null || index >= gyro.z.size()) ? null : gyro.z[index];
-            if (isGyroOutlier(gx, gy, gz)) {
+            var gyroOutlier = isGyroOutlier(gx, gy, gz);
+            if (gyroOutlier) {
                 quality |= JrConstants.FLAG_GYRO_OUTLIER;
                 _stats.gyroOutlier();
             }
-            var detectorResult = _detector.observe(normalized, accel.x[index], accel.y[index], accel.z[index]);
-            if (detectorResult == 1 && _mode.equals(JrConstants.MODE_CANDIDATE_WINDOWS)) { _postCandidateRemaining = _rate; }
-            if (_postCandidateRemaining > 0) {
-                _postCandidateRemaining -= 1;
-                if (_postCandidateRemaining == 0) { _captureFrozen = true; _limitReached = true; }
+            var detectorResult = _detector.observe(normalized, accel.x[index], accel.y[index], accel.z[index], quality, gx, gy, gz, gyroOutlier);
+            if (detectorResult == 1 && _mode.equals(JrConstants.MODE_CANDIDATE_WINDOWS)) { _postCandidateUntil = normalized + 1000; }
+            if (_postCandidateUntil != null && normalized >= _postCandidateUntil) {
+                _captureFrozen = true;
+                _limitReached = true;
+                _postCandidateUntil = null;
             }
             if (!_captureFrozen && !_mode.equals(JrConstants.MODE_SUMMARY_ONLY)) {
                 // A full raw transport buffer is not a sensor-runtime limit.

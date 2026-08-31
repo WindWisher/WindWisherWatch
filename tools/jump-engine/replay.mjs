@@ -11,6 +11,8 @@ export function safeCandidate(candidate) {
     experimentalAirtimeMilliseconds: candidate.experimentalAirtimeMilliseconds,
     confidence: candidate.confidence,
     qualityFlags: candidate.qualityFlags,
+    reasonCodes: candidate.reasonCodes,
+    evidence: candidate.evidence,
     jumpAlgorithmVersion: candidate.jumpAlgorithmVersion,
   };
 }
