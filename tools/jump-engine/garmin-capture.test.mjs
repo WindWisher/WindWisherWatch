@@ -137,3 +137,61 @@ test("rejects truncation, count mismatch, sequence gaps and unsafe bounds", asyn
     /unsafe sample bound/,
   );
 });
+
+test("preserves operator reference and aligns it to an on-device candidate", async () => {
+  const records = syntheticCapture()
+    .trimEnd()
+    .split("\n")
+    .map((line) => JSON.parse(line.slice("WWJUMP|".length)));
+  records[0].researchSchemaVersion = "1.1.0";
+  const summary = records.find((record) => record.recordType === "summary");
+  summary.detector.candidateTraces = [
+    {
+      candidateId: "candidate-1",
+      status: "CONFIRMED",
+      takeoffMilliseconds: 400,
+      landingMilliseconds: 1120,
+    },
+  ];
+  summary.operatorReference = {
+    referenceSchemaVersion: "1.0.0",
+    trialId: "AT3-r1",
+    datasetSplit: "TUNING",
+    expectedEventType: "CONTROLLED_HOP",
+    timestampQuality: "VALID",
+    markers: [
+      {
+        referenceId: "AT3-r1:m0",
+        markerType: "TRIAL_START",
+        timestampMilliseconds: 0,
+        normalizedTimestampMilliseconds: null,
+        nearestSequence: null,
+        uncertaintyBeforeMilliseconds: 0,
+        uncertaintyAfterMilliseconds: 0,
+        provenance: "OPERATOR_START",
+      },
+      {
+        referenceId: "AT3-r1:m1",
+        markerType: "POST_EVENT_MARK",
+        timestampMilliseconds: 1200,
+        normalizedTimestampMilliseconds: 1200,
+        nearestSequence: 30,
+        uncertaintyBeforeMilliseconds: 1000,
+        uncertaintyAfterMilliseconds: 100,
+        provenance: "OPERATOR_POST_EVENT_SELECT",
+      },
+    ],
+  };
+  const capture = await parseGarminResearchCapture(
+    `${records.map((record) => `WWJUMP|${JSON.stringify(record)}`).join("\n")}\n`,
+  );
+  const replay = replayGarminResearchCapture(capture);
+  assert.equal(replay.operatorReference.trialId, "AT3-r1");
+  assert.deepEqual(replay.referenceAlignment.counts, {
+    matched: 1,
+    missed: 0,
+    extraDetections: 0,
+    falsePositives: 0,
+    ambiguous: 0,
+  });
+});

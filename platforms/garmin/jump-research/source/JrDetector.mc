@@ -10,6 +10,7 @@ class JrDetector {
     private const GROUNDED_MINIMUM_MILLIG = 714;
     private const GROUNDED_MAXIMUM_MILLIG = 1325;
     private const LANDING_IMPULSE_MILLIG = 1529;
+    private const MAX_JUMP_ENVELOPE_FLIGHT_MINIMUM_MILLIG = 408;
     private const MIN_FLIGHT_MILLISECONDS = 240;
     private const MIN_SUSTAINED_LOW_G_MILLISECONDS = 120;
     private const MAX_FLIGHT_MILLISECONDS = 3000;
@@ -26,6 +27,7 @@ class JrDetector {
     private var _landing = null;
     private var _landingStable = false;
     private var _stateStarted = 0;
+    private var _latestObservedTimestamp = null;
     private var _confirmed = 0;
     private var _rejected = 0;
     private var _candidateCount = 0;
@@ -36,8 +38,17 @@ class JrDetector {
     private var _smoothingIndex = 0;
     private var _smoothingSum = 0.0;
     private var _lastAirtime = null;
-    private var _peakAccel = 0.0;
-    private var _minimumFlightAccel = null;
+    private var _takeoffPeakAccel = 0.0;
+    private var _flightMinimumAccel = null;
+    private var _landingPeakAccel = null;
+    private var _postEventPeakAccel = null;
+    private var _decisionTakeoffPeakAccel = null;
+    private var _decisionFlightMinimumAccel = null;
+    private var _decisionLandingPeakAccel = null;
+    private var _decisionFlightDuration = null;
+    private var _decisionSustainedLowG = null;
+    private var _decisionEnvelopeMatched = false;
+    private var _shortFlight = false;
     private var _maximumSustainedLowG = 0;
     private var _lowGStreakStarted = null;
     private var _qualityMask = 0;
@@ -52,8 +63,17 @@ class JrDetector {
     private var _traces = [];
     private var _traceStatuses = [];
     private var _traceWriteIndex = 0;
+    private var _locomotion;
+    private var _preImpactCount = 0;
+    private var _preIntervalMean = null;
+    private var _preIntervalCv = null;
+    private var _prePreviousImpactDelta = null;
+    private var _preLocomotionState = "LOCOMOTION_NONE";
 
-    function initialize(profile) { _smoothingSize = profile.equals("HIGH") ? 5 : 3; }
+    function initialize(profile) {
+        _smoothingSize = profile.equals("HIGH") ? 5 : 3;
+        _locomotion = new JrLocomotionContext();
+    }
     function magnitude(x, y, z) { return Math.sqrt((x * x) + (y * y) + (z * z)); }
 
     function smooth(value) {
@@ -71,8 +91,10 @@ class JrDetector {
     }
 
     function observe(normalizedTimestamp, ax, ay, az, quality, gx, gy, gz, gyroOutlier) {
+        _latestObservedTimestamp = normalizedTimestamp;
         var raw = magnitude(ax, ay, az);
         var filtered = smooth(raw);
+        _locomotion.observe(normalizedTimestamp, raw, quality);
         if (_state == STATE_GROUND) {
             if (raw >= TAKEOFF_IMPULSE_MILLIG) {
                 _activeCandidateId = _candidateCount;
@@ -81,7 +103,7 @@ class JrDetector {
                 _stateStarted = normalizedTimestamp;
                 _impulse = normalizedTimestamp;
                 _candidateStarted = normalizedTimestamp;
-                _peakAccel = raw;
+                _takeoffPeakAccel = raw;
                 _qualityMask = quality;
                 _reasonMask = JrConstants.REASON_TAKEOFF_IMPULSE_FOUND;
                 _gyroValidSamples = 0;
@@ -91,9 +113,25 @@ class JrDetector {
                 _takeoffY = ay;
                 _takeoffZ = az;
                 _landingDirectionCosine = null;
-                _minimumFlightAccel = null;
+                _flightMinimumAccel = null;
+                _landingPeakAccel = null;
+                _postEventPeakAccel = null;
+                _decisionTakeoffPeakAccel = null;
+                _decisionFlightMinimumAccel = null;
+                _decisionLandingPeakAccel = null;
+                _decisionFlightDuration = null;
+                _decisionSustainedLowG = null;
+                _decisionEnvelopeMatched = false;
+                _shortFlight = false;
                 _maximumSustainedLowG = 0;
                 _lowGStreakStarted = null;
+                var preEnd = normalizedTimestamp - 1;
+                var preStart = _locomotion.defaultStart(preEnd);
+                _preImpactCount = _locomotion.count(preStart, preEnd);
+                _preIntervalMean = _locomotion.intervalMean(preStart, preEnd);
+                _preIntervalCv = _locomotion.intervalCv(preStart, preEnd);
+                _prePreviousImpactDelta = _locomotion.previousDelta(preEnd);
+                _preLocomotionState = _locomotion.state(preStart, preEnd);
                 observeGyro(gx, gy, gz, gyroOutlier);
             }
             return 0;
@@ -101,10 +139,10 @@ class JrDetector {
 
         _qualityMask |= quality;
         if ((quality & JrConstants.FLAG_TIMESTAMP_DEGRADED) != 0) { _reasonMask |= JrConstants.REASON_TIMESTAMP_DEGRADED; }
-        _peakAccel = raw > _peakAccel ? raw : _peakAccel;
         observeGyro(gx, gy, gz, gyroOutlier);
 
         if (_state == STATE_TAKEOFF) {
+            _takeoffPeakAccel = raw > _takeoffPeakAccel ? raw : _takeoffPeakAccel;
             if (normalizedTimestamp - _candidateStarted > MAX_TAKEOFF_CANDIDATE_MILLISECONDS) {
                 _reasonMask |= JrConstants.REASON_NO_FLIGHT_PHASE;
                 return finishCandidate("REJECTED", normalizedTimestamp);
@@ -120,7 +158,7 @@ class JrDetector {
                 return finishCandidate("REJECTED", normalizedTimestamp);
             } else if (filtered <= LOW_G_MILLIG) {
                 _takeoff = normalizedTimestamp;
-                _minimumFlightAccel = filtered;
+                _flightMinimumAccel = filtered;
                 _maximumSustainedLowG = 0;
                 _lowGStreakStarted = normalizedTimestamp;
                 _reasonMask |= JrConstants.REASON_LOW_G_PHASE_FOUND;
@@ -131,7 +169,7 @@ class JrDetector {
 
         if (_state == STATE_FLIGHT) {
             var duration = normalizedTimestamp - _takeoff;
-            _minimumFlightAccel = filtered < _minimumFlightAccel ? filtered : _minimumFlightAccel;
+            _flightMinimumAccel = filtered < _flightMinimumAccel ? filtered : _flightMinimumAccel;
             if (filtered <= LOW_G_MILLIG) {
                 if (_lowGStreakStarted == null) { _lowGStreakStarted = normalizedTimestamp; }
                 var lowGDuration = normalizedTimestamp - _lowGStreakStarted;
@@ -140,23 +178,37 @@ class JrDetector {
             if (duration > MAX_FLIGHT_MILLISECONDS) { return finishCandidate("REJECTED", normalizedTimestamp); }
             if (raw >= LANDING_IMPULSE_MILLIG) {
                 _landing = normalizedTimestamp;
+                _landingPeakAccel = raw;
                 var directionDenominator = magnitude(_takeoffX, _takeoffY, _takeoffZ) * raw;
                 _landingDirectionCosine = directionDenominator == 0 ? null : ((_takeoffX * ax) + (_takeoffY * ay) + (_takeoffZ * az)) / directionDenominator;
-                if (_landingDirectionCosine != null && _landingDirectionCosine < MIN_TAKEOFF_LANDING_DIRECTION_COSINE) {
+                var hasJumpImpulseLowGEnvelope = _takeoffPeakAccel >= JrConstants.TAKEOFF_PEAK_THRESHOLD_MILLIG
+                    && _flightMinimumAccel != null
+                    && _flightMinimumAccel <= MAX_JUMP_ENVELOPE_FLIGHT_MINIMUM_MILLIG;
+                _decisionTakeoffPeakAccel = _takeoffPeakAccel;
+                _decisionFlightMinimumAccel = _flightMinimumAccel;
+                _decisionLandingPeakAccel = _landingPeakAccel;
+                _decisionFlightDuration = duration;
+                _decisionSustainedLowG = _maximumSustainedLowG;
+                _decisionEnvelopeMatched = hasJumpImpulseLowGEnvelope;
+                if (!hasJumpImpulseLowGEnvelope) {
                     _qualityMask |= JrConstants.FLAG_ARM_MOTION_PATTERN;
                     _reasonMask |= JrConstants.REASON_ARM_MOTION_PATTERN;
-                } else if (_landingDirectionCosine != null) { _reasonMask |= JrConstants.REASON_IMPULSE_DIRECTION_CONSISTENT; }
+                    _reasonMask |= JrConstants.REASON_JUMP_IMPULSE_LOW_G_ENVELOPE_MISSING;
+                } else { _reasonMask |= JrConstants.REASON_JUMP_IMPULSE_LOW_G_ENVELOPE_FOUND; }
+                if (_landingDirectionCosine != null && _landingDirectionCosine >= MIN_TAKEOFF_LANDING_DIRECTION_COSINE) { _reasonMask |= JrConstants.REASON_IMPULSE_DIRECTION_CONSISTENT; }
                 _reasonMask |= JrConstants.REASON_LANDING_IMPULSE_FOUND;
-                if (duration < MIN_FLIGHT_MILLISECONDS || _maximumSustainedLowG < MIN_SUSTAINED_LOW_G_MILLISECONDS) {
+                _shortFlight = duration < MIN_FLIGHT_MILLISECONDS || _maximumSustainedLowG < MIN_SUSTAINED_LOW_G_MILLISECONDS;
+                if (_shortFlight) {
                     if (_maximumSustainedLowG < MIN_SUSTAINED_LOW_G_MILLISECONDS) { _reasonMask |= JrConstants.REASON_LOW_G_TOO_BRIEF; }
-                    return finishCandidate("REJECTED", normalizedTimestamp);
+                } else {
+                    _reasonMask |= JrConstants.REASON_FLIGHT_DURATION_PLAUSIBLE | JrConstants.REASON_LOW_G_DURATION_PLAUSIBLE;
                 }
-                _reasonMask |= JrConstants.REASON_FLIGHT_DURATION_PLAUSIBLE | JrConstants.REASON_LOW_G_DURATION_PLAUSIBLE;
                 _state = STATE_LANDING;
             }
             return 0;
         }
 
+        _postEventPeakAccel = _postEventPeakAccel == null || raw > _postEventPeakAccel ? raw : _postEventPeakAccel;
         if (filtered >= GROUNDED_MINIMUM_MILLIG && filtered <= GROUNDED_MAXIMUM_MILLIG && normalizedTimestamp - _landing >= LANDING_STABILIZATION_MILLISECONDS) {
             _landingStable = true;
             _reasonMask |= JrConstants.REASON_LANDING_STABLE;
@@ -166,6 +218,7 @@ class JrDetector {
                 _reasonMask |= JrConstants.REASON_LANDING_NOT_STABLE;
                 return finishCandidate("REJECTED", normalizedTimestamp);
             }
+            if (_shortFlight) { return finishCandidate("REJECTED", normalizedTimestamp); }
             if ((_reasonMask & JrConstants.REASON_ARM_MOTION_PATTERN) != 0) { return finishCandidate("REJECTED", normalizedTimestamp); }
             _lastAirtime = _landing - _takeoff;
             return finishCandidate("CONFIRMED", normalizedTimestamp);
@@ -187,21 +240,40 @@ class JrDetector {
 
     function finishCandidate(status, endTime) {
         if (status.equals("CONFIRMED")) { _confirmed += 1; } else { _rejected += 1; }
+        var postStart = _landing == null ? endTime : _landing + 100;
         var trace = "{\"candidateId\":" + _activeCandidateId
             + ",\"status\":\"" + status + "\""
+            + ",\"candidateStartedMilliseconds\":" + value(_candidateStarted)
+            + ",\"takeoffMilliseconds\":" + value(_takeoff)
+            + ",\"landingMilliseconds\":" + value(_landing)
             + ",\"reasonMask\":" + _reasonMask
             + ",\"qualityMask\":" + _qualityMask
             + ",\"impulseToFlightMilliseconds\":" + value(_takeoff == null ? null : _takeoff - _impulse)
             + ",\"candidateToFlightMilliseconds\":" + value(_takeoff == null ? null : _takeoff - _candidateStarted)
             + ",\"sustainedLowGMilliseconds\":" + _maximumSustainedLowG
             + ",\"flightToLandingMilliseconds\":" + value((_takeoff == null || _landing == null) ? null : _landing - _takeoff)
-            + ",\"peakAccelMillig\":" + _peakAccel
-            + ",\"minimumFlightAccelMillig\":" + value(_minimumFlightAccel)
+            + ",\"takeoffPeakAccelMillig\":" + _takeoffPeakAccel
+            + ",\"flightMinimumAccelMillig\":" + value(_flightMinimumAccel)
+            + ",\"landingPeakAccelMillig\":" + value(_landingPeakAccel)
+            + ",\"featuresAtDecision\":{\"takeoffPeakAccelMillig\":" + value(_decisionTakeoffPeakAccel)
+            + ",\"flightMinimumAccelMillig\":" + value(_decisionFlightMinimumAccel)
+            + ",\"landingPeakAccelMillig\":" + value(_decisionLandingPeakAccel)
+            + ",\"flightDurationMilliseconds\":" + value(_decisionFlightDuration)
+            + ",\"sustainedLowGMilliseconds\":" + value(_decisionSustainedLowG)
+            + ",\"takeoffPeakThresholdMillig\":" + JrConstants.TAKEOFF_PEAK_THRESHOLD_MILLIG
+            + ",\"maximumFlightMinimumMillig\":" + MAX_JUMP_ENVELOPE_FLIGHT_MINIMUM_MILLIG
+            + ",\"envelopeMatched\":" + (_decisionEnvelopeMatched ? "true" : "false") + "}"
+            + ",\"postEventDiagnostics\":{\"peakAccelMillig\":" + value(_postEventPeakAccel) + "}"
             + ",\"landingStable\":" + (_landingStable ? "true" : "false")
             + ",\"gyroValidSamples\":" + _gyroValidSamples
             + ",\"gyroOutlierSamples\":" + _gyroOutlierSamples
             + ",\"maximumValidGyro\":" + _maximumValidGyro
             + ",\"takeoffLandingDirectionCosine\":" + value(_landingDirectionCosine)
+            + ",\"locomotionContext\":{\"observerOnly\":true,\"preState\":\"" + _preLocomotionState + "\",\"preImpactCount\":" + _preImpactCount
+            + ",\"preIntervalMeanMilliseconds\":" + value(_preIntervalMean) + ",\"preIntervalCoefficientOfVariation\":" + value(_preIntervalCv)
+            + ",\"previousImpactDeltaMilliseconds\":" + value(_prePreviousImpactDelta) + ",\"postImpactCount\":" + _locomotion.count(postStart, endTime)
+            + ",\"postIntervalMeanMilliseconds\":" + value(_locomotion.intervalMean(postStart, endTime)) + ",\"postIntervalCoefficientOfVariation\":" + value(_locomotion.intervalCv(postStart, endTime))
+            + ",\"postState\":\"" + _locomotion.state(postStart, endTime) + "\"}"
             + ",\"endMilliseconds\":" + endTime + "}";
         retainTrace(trace, status);
         resetState();
@@ -239,7 +311,9 @@ class JrDetector {
     function finish() {
         if (_state != STATE_GROUND) {
             _reasonMask |= JrConstants.REASON_SESSION_ENDED;
-            finishCandidate("REJECTED", _stateStarted);
+            // End in the same normalized sample domain as takeoff/landing.
+            // _stateStarted is the last takeoff impulse, not the last sample.
+            finishCandidate("REJECTED", _latestObservedTimestamp);
         }
     }
 
@@ -255,7 +329,19 @@ class JrDetector {
         }
         return output + "]";
     }
+    function confirmedTracesJson() {
+        var output = "[";
+        var emitted = 0;
+        for (var index = 0; index < _traces.size(); index += 1) {
+            if (!_traceStatuses[index].equals("CONFIRMED")) { continue; }
+            if (emitted > 0) { output += ","; }
+            output += _traces[index];
+            emitted += 1;
+        }
+        return output + "]";
+    }
     function retainedTraceCount() { return _traces.size(); }
+    function locomotionContext() { return _locomotion; }
     function stateName() {
         if (_state == STATE_TAKEOFF) { return "POSSIBLE_TAKEOFF"; }
         if (_state == STATE_FLIGHT) { return "FLIGHT"; }

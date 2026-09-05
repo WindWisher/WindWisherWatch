@@ -9,6 +9,7 @@ import {
   ReasonCode,
 } from "./model.mjs";
 import { FixedRingBuffer } from "./ring-buffer.mjs";
+import { LocomotionContext } from "./locomotion-context.mjs";
 import { TimestampNormalizer } from "./timestamp-normalizer.mjs";
 
 function addBoundedFlag(active, flag, limit) {
@@ -50,6 +51,7 @@ export class ExperimentalJumpEngine {
     this.rolling = new FixedRingBuffer(
       Math.ceil(this.config.sampleRateHz * this.config.rollingWindowSeconds),
     );
+    this.locomotion = new LocomotionContext(this.config);
     this.activeWindowCapacity =
       this.rolling.capacity +
       Math.ceil(
@@ -125,7 +127,9 @@ export class ExperimentalJumpEngine {
           this.config.notableFlagLimit,
         );
     }
-    return this.advance(observation);
+    const result = this.advance(observation);
+    this.locomotion.observe(observation);
+    return result;
   }
 
   advance(observation) {
@@ -144,12 +148,16 @@ export class ExperimentalJumpEngine {
           takeoffTime: null,
           landingTime: null,
           landingStable: false,
-          peakAccelMps2: observation.accelMagnitude,
+          takeoffPeakAccelMps2: observation.accelMagnitude,
+          landingPeakAccelMps2: null,
+          postEventPeakAccelMps2: null,
+          decisionSnapshot: null,
           takeoffImpulseVector: structuredClone(observation.accel),
           landingImpulseVector: null,
-          minimumFlightAccelMps2: observation.accelMagnitude,
+          flightMinimumAccelMps2: observation.accelMagnitude,
           flags: [...observation.timestamp.qualityFlags],
           reasons: [ReasonCode.TAKEOFF_IMPULSE_FOUND],
+          preLocomotionContext: this.locomotion.summaryAt(time),
           window: this.rolling.snapshot(),
           gyroPlausibleSamples:
             observation.gyro.quality === GyroQuality.PLAUSIBLE ? 1 : 0,
@@ -185,10 +193,6 @@ export class ExperimentalJumpEngine {
       return null;
     }
 
-    this.active.peakAccelMps2 = Math.max(
-      this.active.peakAccelMps2,
-      observation.accelMagnitude,
-    );
     if (observation.pressurePascals !== undefined)
       this.active.latestPressurePascals = observation.pressurePascals;
     if (observation.speedMps !== undefined)
@@ -199,6 +203,10 @@ export class ExperimentalJumpEngine {
       this.active.gyroOutlierSamples += 1;
 
     if (this.state === JumpState.POSSIBLE_TAKEOFF) {
+      this.active.takeoffPeakAccelMps2 = Math.max(
+        this.active.takeoffPeakAccelMps2,
+        observation.accelMagnitude,
+      );
       if (
         time - this.active.candidateStartTime >
         this.config.maximumTakeoffCandidateMilliseconds
@@ -249,7 +257,7 @@ export class ExperimentalJumpEngine {
         this.active.flightStartTime = time;
         this.active.lowGLastTime = time;
         this.active.lowGStreakStartTime = time;
-        this.active.minimumFlightAccelMps2 = observation.smoothedAccelMagnitude;
+        this.active.flightMinimumAccelMps2 = observation.smoothedAccelMagnitude;
         addBoundedReason(
           this.active,
           ReasonCode.LOW_G_PHASE_FOUND,
@@ -261,8 +269,8 @@ export class ExperimentalJumpEngine {
     }
 
     if (this.state === JumpState.FLIGHT) {
-      this.active.minimumFlightAccelMps2 = Math.min(
-        this.active.minimumFlightAccelMps2,
+      this.active.flightMinimumAccelMps2 = Math.min(
+        this.active.flightMinimumAccelMps2,
         observation.smoothedAccelMagnitude,
       );
       if (observation.smoothedAccelMagnitude <= this.config.lowGEnterMps2) {
@@ -285,16 +293,33 @@ export class ExperimentalJumpEngine {
       }
       if (observation.accelMagnitude >= this.config.landingImpulseMps2) {
         this.active.landingTime = time;
+        this.active.landingPeakAccelMps2 = observation.accelMagnitude;
         this.active.landingImpulseVector = structuredClone(observation.accel);
         const directionCosine = vectorCosine(
           this.active.takeoffImpulseVector,
           this.active.landingImpulseVector,
         );
         this.active.takeoffLandingDirectionCosine = directionCosine;
-        if (
-          directionCosine !== null &&
-          directionCosine < this.config.minimumTakeoffLandingDirectionCosine
-        ) {
+        const hasJumpImpulseLowGEnvelope =
+          this.active.takeoffPeakAccelMps2 >=
+            this.config.minimumTakeoffPeakMps2 &&
+          this.active.flightMinimumAccelMps2 !== null &&
+          this.active.flightMinimumAccelMps2 <=
+            this.config.maximumJumpEnvelopeFlightMinimumMps2;
+        this.active.decisionSnapshot = Object.freeze({
+          takeoffPeakAccelMps2: this.active.takeoffPeakAccelMps2,
+          flightMinimumAccelMps2: this.active.flightMinimumAccelMps2,
+          landingPeakAccelMps2: this.active.landingPeakAccelMps2,
+          flightDurationMilliseconds: duration,
+          sustainedLowGMilliseconds:
+            this.active.maximumSustainedLowGMilliseconds,
+          takeoffPeakThresholdMillig: this.config.takeoffPeakThresholdMillig,
+          takeoffPeakThresholdMps2: this.config.minimumTakeoffPeakMps2,
+          maximumFlightMinimumMps2:
+            this.config.maximumJumpEnvelopeFlightMinimumMps2,
+          envelopeMatched: hasJumpImpulseLowGEnvelope,
+        });
+        if (!hasJumpImpulseLowGEnvelope) {
           addBoundedFlag(
             this.active,
             QualityFlag.ARM_MOTION_PATTERN,
@@ -305,7 +330,22 @@ export class ExperimentalJumpEngine {
             ReasonCode.ARM_MOTION_PATTERN,
             this.config.notableFlagLimit,
           );
-        } else if (directionCosine !== null)
+          addBoundedReason(
+            this.active,
+            ReasonCode.JUMP_IMPULSE_LOW_G_ENVELOPE_MISSING,
+            this.config.notableFlagLimit,
+          );
+        } else {
+          addBoundedReason(
+            this.active,
+            ReasonCode.JUMP_IMPULSE_LOW_G_ENVELOPE_FOUND,
+            this.config.notableFlagLimit,
+          );
+        }
+        if (
+          directionCosine !== null &&
+          directionCosine >= this.config.minimumTakeoffLandingDirectionCosine
+        )
           addBoundedReason(
             this.active,
             ReasonCode.IMPULSE_DIRECTION_CONSISTENT,
@@ -354,6 +394,10 @@ export class ExperimentalJumpEngine {
       return null;
     }
 
+    this.active.postEventPeakAccelMps2 = Math.max(
+      this.active.postEventPeakAccelMps2 ?? 0,
+      observation.accelMagnitude,
+    );
     if (
       observation.smoothedAccelMagnitude >= this.config.groundedMinimumMps2 &&
       observation.smoothedAccelMagnitude <= this.config.groundedMaximumMps2 &&
@@ -466,10 +510,23 @@ export class ExperimentalJumpEngine {
           plausibleSamples: active.gyroPlausibleSamples,
           outlierSamples: active.gyroOutlierSamples,
         }),
+        locomotionContext: Object.freeze({
+          observerOnly: true,
+          preEvent: active.preLocomotionContext,
+          postEvent:
+            active.landingTime === null
+              ? null
+              : this.locomotion.summaryAt(endTime, active.landingTime + 100),
+        }),
       }),
       featureSummary: Object.freeze({
-        peakAccelMps2: active.peakAccelMps2,
-        minimumFlightAccelMps2: active.minimumFlightAccelMps2,
+        takeoffPeakAccelMps2: active.takeoffPeakAccelMps2,
+        flightMinimumAccelMps2: active.flightMinimumAccelMps2,
+        landingPeakAccelMps2: active.landingPeakAccelMps2,
+        featuresAtDecision: active.decisionSnapshot,
+        postEventDiagnostics: Object.freeze({
+          peakAccelMps2: active.postEventPeakAccelMps2,
+        }),
         gyroPlausibleSamples: active.gyroPlausibleSamples,
         gyroOutlierSamples: active.gyroOutlierSamples,
         ...(active.initialPressurePascals !== null &&
@@ -547,6 +604,7 @@ export class ExperimentalJumpEngine {
         retainedCandidates: this.candidates.length,
         activeWindowCapacity: this.activeWindowCapacity,
         maxActiveSamples: this.maxActiveSamples,
+        locomotionContext: this.locomotion.bounds(),
       },
     };
   }

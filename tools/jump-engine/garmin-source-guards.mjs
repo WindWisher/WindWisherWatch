@@ -13,6 +13,8 @@ const required = [
   "source/JrConstants.mc",
   "source/JrCaptureBuffer.mc",
   "source/JrDetector.mc",
+  "source/JrLocomotionContext.mc",
+  "source/JrOperatorReference.mc",
   "source/JrMotionSource.mc",
   "source/JrStats.mc",
   "source/JrWriter.mc",
@@ -85,6 +87,17 @@ if (
   !controller.includes("drainExport")
 )
   throw new Error("Garmin export is not separated from sensor capture");
+
+const detector = sources.get("JrDetector.mc");
+for (const marker of [
+  "_takeoffPeakAccel",
+  "_flightMinimumAccel",
+  "_landingPeakAccel",
+  "_decisionTakeoffPeakAccel",
+  "postEventDiagnostics",
+])
+  if (!detector.includes(marker))
+    throw new Error(`Garmin detector lacks phase-scoped marker: ${marker}`);
 
 const manifest = await fs.readFile(path.join(project, "manifest.xml"), "utf8");
 if (!manifest.includes('id="Sensor"'))

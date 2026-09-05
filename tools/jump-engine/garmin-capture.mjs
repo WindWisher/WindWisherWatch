@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import readline from "node:readline";
 import { replaySamples } from "./replay.mjs";
+import {
+  alignOperatorReference,
+  validateOperatorReference,
+} from "./operator-reference.mjs";
 
 const PREFIX = "WWJUMP|";
 const MAX_RECORDS = 800;
@@ -72,7 +76,7 @@ export async function parseGarminResearchCapture(input) {
     }
     if (record.recordType === "manifest") {
       if (manifest) throw new Error("Garmin research manifest is duplicated");
-      if (record.researchSchemaVersion !== "1.0.0")
+      if (!["1.0.0", "1.1.0", "1.2.0"].includes(record.researchSchemaVersion))
         throw new Error("Unsupported Garmin research capture version");
       if (!["MEDIUM", "HIGH"].includes(record.sensorProfile))
         throw new Error("Unsupported Garmin research sensor profile");
@@ -116,6 +120,8 @@ export async function parseGarminResearchCapture(input) {
     throw new Error("Garmin research capture is truncated");
   if (completion.records !== samples.length)
     throw new Error("Garmin research completion count does not match capture");
+  if (summary.operatorReference)
+    validateOperatorReference(summary.operatorReference);
   return { manifest, samples, summary, completion };
 }
 
@@ -166,6 +172,23 @@ export function replayGarminResearchCapture(capture) {
   };
   const accelOnly = replaySamples(hostSamples(capture, false), common);
   const accelPlusGyro = replaySamples(hostSamples(capture, true), common);
+  const onDeviceCandidates = (
+    capture.summary.detector.candidateTraces ?? []
+  ).map((candidate) => ({
+    candidateId: candidate.candidateId,
+    status: candidate.status,
+    takeoffMilliseconds: candidate.takeoffMilliseconds,
+    landingMilliseconds: candidate.landingMilliseconds,
+  }));
+  const operatorReference = capture.summary.operatorReference ?? null;
+  const referenceAlignment = operatorReference
+    ? alignOperatorReference({
+        reference: operatorReference,
+        candidates: onDeviceCandidates,
+        sampleIntervalMilliseconds:
+          capture.manifest.sensorProfile === "HIGH" ? 20 : 40,
+      })
+    : null;
   return {
     evidenceLevel: "HOST_REPLAY_OF_HARDWARE_CAPTURE",
     experimentId: capture.manifest.experimentId,
@@ -177,6 +200,8 @@ export function replayGarminResearchCapture(capture) {
     callbackStatistics: capture.summary.callbackStatistics,
     memory: capture.summary.memory,
     onDeviceDetector: capture.summary.detector,
+    operatorReference,
+    referenceAlignment,
     accelOnly: {
       candidates: accelOnly.candidates,
       summary: accelOnly.engine,

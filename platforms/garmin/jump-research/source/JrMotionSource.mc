@@ -15,16 +15,19 @@ class JrMotionSource {
     private var _captureFrozen = false;
     private var _postCandidateUntil = null;
     private var _limitReached = false;
+    private var _freezeAfterConfirmed = 1;
 
-    function initialize(profile, mode, rate) {
+    function initialize(profile, mode, rate, freezeAfterConfirmed) {
         _profile = profile;
         _mode = mode;
         _rate = rate;
         _expectedInterval = 1000 / rate;
-        _buffer = new JrCaptureBuffer(JrConstants.MAX_CAPTURE_SAMPLES);
+        var captureCapacity = mode.equals(JrConstants.MODE_CANDIDATE_WINDOWS) ? JrConstants.MAX_CANDIDATE_WINDOW_SAMPLES : JrConstants.MAX_CAPTURE_SAMPLES;
+        _buffer = new JrCaptureBuffer(captureCapacity);
         _buffer.reset(mode.equals(JrConstants.MODE_CANDIDATE_WINDOWS));
         _stats = new JrStats();
         _detector = new JrDetector(profile);
+        _freezeAfterConfirmed = freezeAfterConfirmed;
     }
 
     function start() {
@@ -46,6 +49,7 @@ class JrMotionSource {
     }
 
     function onSensorData(data as Sensor.SensorData) as Void {
+        if (!_running) { return; }
         var callbackStart = JrClock.now();
         var accel = data.accelerometerData;
         var gyro = data.gyroscopeData;
@@ -89,7 +93,7 @@ class JrMotionSource {
                 _stats.gyroOutlier();
             }
             var detectorResult = _detector.observe(normalized, accel.x[index], accel.y[index], accel.z[index], quality, gx, gy, gz, gyroOutlier);
-            if (detectorResult == 1 && _mode.equals(JrConstants.MODE_CANDIDATE_WINDOWS)) { _postCandidateUntil = normalized + 1000; }
+            if (detectorResult == 1 && _mode.equals(JrConstants.MODE_CANDIDATE_WINDOWS) && _detector.confirmed() >= _freezeAfterConfirmed) { _postCandidateUntil = normalized; }
             if (_postCandidateUntil != null && normalized >= _postCandidateUntil) {
                 _captureFrozen = true;
                 _limitReached = true;
@@ -117,6 +121,8 @@ class JrMotionSource {
     function buffer() { return _buffer; }
     function stats() { return _stats; }
     function detector() { return _detector; }
+    function mode() { return _mode; }
     function limitReached() { return _limitReached; }
     function sequence() { return _sequence; }
+    function lastNormalizedTimestamp() { return _lastNormalizedTimestamp; }
 }

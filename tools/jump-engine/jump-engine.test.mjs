@@ -18,12 +18,57 @@ const fixturePath = path.join(
 );
 const catalog = await loadScenarioCatalog(fixturePath);
 
+test("finalization uses latest sample across phases and batched callback clocks", () => {
+  for (const stop of [400, 480, 640, 680, 840, 1680]) {
+    const engine = new ExperimentalJumpEngine({
+      sessionId: "timing",
+      profile: "MEDIUM",
+    });
+    for (let t = 0; t <= stop; t += 40) {
+      const a =
+        t === 400 ? 3200 : t > 400 && t < 680 ? 200 : t === 680 ? 1800 : 1000;
+      engine.process({
+        sequence: t / 40,
+        rawSampleTimestamp: t,
+        callbackTimestamp: 0,
+        accel: { x: a * 0.00980665, y: 0, z: 0 },
+      });
+    }
+    engine.endSession();
+    const candidate = engine.candidates[0];
+    assert.equal(candidate.endMilliseconds, stop);
+    const times = [
+      candidate.startMilliseconds,
+      candidate.takeoffCandidateMilliseconds,
+      candidate.landingCandidateMilliseconds,
+      candidate.endMilliseconds,
+    ].filter(Number.isFinite);
+    assert.deepEqual(
+      times,
+      [...times].sort((a, b) => a - b),
+    );
+    const snapshot = JSON.stringify(candidate);
+    engine.endSession();
+    assert.equal(JSON.stringify(candidate), snapshot);
+  }
+});
+
 function generated(id, profile = "MEDIUM") {
   return generateScenario(catalog, id, profile);
 }
 
 function stableResult(result) {
   return { candidates: result.candidates, engine: result.engine };
+}
+
+function candidateWithFeatures(id, profile = "MEDIUM") {
+  const engine = new ExperimentalJumpEngine({
+    sessionId: `features-${id}`,
+    profile,
+  });
+  for (const sample of generated(id, profile).samples) engine.process(sample);
+  engine.endSession();
+  return { candidate: engine.candidates[0], config: engine.config };
 }
 
 for (const profile of ["MEDIUM", "HIGH"])
@@ -127,6 +172,108 @@ test("directional arm-motion hypothesis is rejected with a typed reason", () => 
   );
 });
 
+test("aligned AT2 aggregate is rejected when the impulse-low-g envelope is missing", () => {
+  const result = replaySamples(
+    generated("brisk-walking-false-positive-envelope-v1").samples,
+    { sessionId: "at2-envelope-regression" },
+  );
+  assert.equal(result.engine.confirmedCandidates, 0);
+  assert.ok(
+    result.candidates.some((candidate) =>
+      candidate.reasonCodes.includes(
+        ReasonCode.JUMP_IMPULSE_LOW_G_ENVELOPE_MISSING,
+      ),
+    ),
+  );
+});
+
+for (const id of [
+  "hp1-like-late-post-event-peak-v1",
+  "hp2-like-late-post-event-peak-v1",
+])
+  test(`${id} keeps decision features immutable after a late peak`, () => {
+    const { candidate, config } = candidateWithFeatures(id);
+    const features = candidate.featureSummary;
+    assert.equal(candidate.status, CandidateStatus.REJECTED);
+    assert.ok(Object.isFrozen(features.featuresAtDecision));
+    assert.equal(
+      features.takeoffPeakAccelMps2,
+      features.featuresAtDecision.takeoffPeakAccelMps2,
+    );
+    assert.ok(
+      features.postEventDiagnostics.peakAccelMps2 >
+        features.featuresAtDecision.takeoffPeakAccelMps2,
+    );
+    assert.equal(features.featuresAtDecision.envelopeMatched, false);
+    assert.ok(
+      features.featuresAtDecision.takeoffPeakAccelMps2 <
+        config.minimumTakeoffPeakMps2,
+    );
+    assert.ok(
+      features.featuresAtDecision.flightMinimumAccelMps2 <=
+        config.maximumJumpEnvelopeFlightMinimumMps2,
+    );
+    assert.ok(
+      candidate.reasonCodes.includes(
+        ReasonCode.JUMP_IMPULSE_LOW_G_ENVELOPE_MISSING,
+      ),
+    );
+  });
+
+test("AT2-like late walking peak cannot retroactively satisfy takeoff evidence", () => {
+  const { candidate } = candidateWithFeatures(
+    "brisk-walking-false-positive-envelope-v1",
+  );
+  assert.equal(candidate.status, CandidateStatus.REJECTED);
+  assert.equal(
+    candidate.featureSummary.featuresAtDecision.envelopeMatched,
+    false,
+  );
+  assert.ok(
+    candidate.featureSummary.postEventDiagnostics.peakAccelMps2 >
+      candidate.featureSummary.featuresAtDecision.takeoffPeakAccelMps2,
+  );
+});
+
+test("HP4-like brisk walking transition preserves the phase-scoped hop", () => {
+  const result = replaySamples(
+    generated("brisk-walking-hop-brisk-walking-phase-v1").samples,
+    { sessionId: "hp4-phase-scoped" },
+  );
+  assert.equal(result.engine.confirmedCandidates, 1);
+  const confirmed = result.candidates.find(
+    (candidate) => candidate.status === CandidateStatus.CONFIRMED,
+  );
+  assert.equal(
+    confirmed.featureSummary.featuresAtDecision.envelopeMatched,
+    true,
+  );
+});
+
+test("canonical 3000 mg takeoff threshold converts without rounding", () => {
+  const engine = new ExperimentalJumpEngine({ sessionId: "threshold-units" });
+  assert.equal(engine.config.takeoffPeakThresholdMillig, 3000);
+  assert.equal(engine.config.minimumTakeoffPeakMps2, 29.41995);
+});
+
+test("aligned AT5 aggregate accepts a strong deep-low-g hop despite divergent wrist direction", () => {
+  const result = replaySamples(
+    generated("locomotion-hop-direction-divergent-envelope-v1").samples,
+    { sessionId: "at5-envelope-regression" },
+  );
+  assert.equal(result.engine.confirmedCandidates, 1);
+  assert.ok(
+    result.candidates[0].reasonCodes.includes(
+      ReasonCode.JUMP_IMPULSE_LOW_G_ENVELOPE_FOUND,
+    ),
+  );
+  assert.ok(
+    !result.candidates[0].reasonCodes.includes(
+      ReasonCode.IMPULSE_DIRECTION_CONSISTENT,
+    ),
+  );
+});
+
 test("J3 HIGH boundary hypothesis has time-equivalent classification", () => {
   for (const profile of ["MEDIUM", "HIGH"]) {
     const result = replaySamples(
@@ -149,6 +296,34 @@ test("J4 separation invariant retains three confirmed candidates", () => {
   );
   assert.equal(result.engine.confirmedCandidates, 3);
   assert.equal(result.engine.rejectedCandidates, 0);
+});
+
+test("periodic brisk walking is rejected with bounded locomotion context", () => {
+  const result = replaySamples(
+    generated("periodic-brisk-walking-context").samples,
+    { sessionId: "periodic-walking" },
+  );
+  assert.equal(result.engine.confirmedCandidates, 0);
+  assert.equal(result.engine.bounds.locomotionContext.capacity, 8);
+  assert.equal(result.engine.bounds.locomotionContext.used, 8);
+});
+
+test("walking to jump to walking preserves the controlled jump despite periodic pre-context", () => {
+  for (const profile of ["MEDIUM", "HIGH"]) {
+    const result = replaySamples(
+      generated("walking-jump-walking-context", profile).samples,
+      { sessionId: `walking-jump-${profile}`, profile },
+    );
+    assert.equal(result.engine.confirmedCandidates, 1, profile);
+    const confirmed = result.candidates.find(
+      (candidate) => candidate.status === CandidateStatus.CONFIRMED,
+    );
+    assert.equal(
+      confirmed.evidence.locomotionContext.preEvent.state,
+      "LOCOMOTION_PERIODIC",
+      profile,
+    );
+  }
 });
 
 test("pressure and speed remain optional context, never primary timing", () => {

@@ -13,6 +13,7 @@ export function safeCandidate(candidate) {
     qualityFlags: candidate.qualityFlags,
     reasonCodes: candidate.reasonCodes,
     evidence: candidate.evidence,
+    featureSummary: candidate.featureSummary,
     jumpAlgorithmVersion: candidate.jumpAlgorithmVersion,
   };
 }

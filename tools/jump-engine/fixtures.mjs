@@ -30,9 +30,16 @@ export function generateScenario(catalog, id, profile = "MEDIUM") {
       let rawSampleTimestamp = callbackTimestamp;
       if (sequence === scenario.duplicateRawTimestampAtSample)
         rawSampleTimestamp = samples.at(-1).rawSampleTimestamp;
-      const accel = segment.accelPatternMps2
-        ? segment.accelPatternMps2[index % segment.accelPatternMps2.length]
+      const periodicImpactSamples = segment.periodicImpactMilliseconds
+        ? Math.max(1, Math.round(segment.periodicImpactMilliseconds / interval))
         : null;
+      const accel = periodicImpactSamples
+        ? index % periodicImpactSamples === 0
+          ? segment.periodicImpactMps2
+          : segment.baselineAccelMps2
+        : segment.accelPatternMps2
+          ? segment.accelPatternMps2[index % segment.accelPatternMps2.length]
+          : null;
       const accelVector = segment.accelVectorPatternMps2
         ? segment.accelVectorPatternMps2[
             index % segment.accelVectorPatternMps2.length

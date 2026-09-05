@@ -1,5 +1,9 @@
 # Controlled false-positive analysis
 
+## M5.3 locomotion-context result
+
+Walking-only tuning produced no confirmations, but early walking→hop→walking trials produced three extra confirmations across three observed hops. Later diagnostics were clean, so the failure is intermittent. A true controlled hop had `LOCOMOTION_PERIODIC` pre-context; periodicity is therefore not a standalone rejection rule. Brisk-walking discrimination remains unresolved.
+
 ## M5.2 update
 
 The historical J5 event was outside the retained raw prefix, so its exact trace is not recoverable. M5.2 reproduced recurrent J5-class false confirmations after adding bounded candidate traces. The original code accepted an impulse, one low-g crossing and a later impact; flight started at the first impulse and Garmin did not require landing stabilization.

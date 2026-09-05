@@ -1,5 +1,13 @@
 # Experimental jump discrimination model
 
+## M5.4B phase semantics
+
+Algorithm `experimental-0.5-phase-scoped-envelope` uses takeoff-only peak acceleration and flight-only minimum acceleration for the physical envelope. Landing-trigger acceleration is supporting evidence; post-event acceleration is diagnostic only. The immutable `featuresAtDecision` snapshot is the sole source for envelope reason reconstruction. See `PHASE_SCOPED_FEATURES.md` and `DECISION_SNAPSHOT.md`.
+
+## M5.3 observer boundary
+
+`LocomotionContext` supplies bounded aggregate evidence but is not a classifier or veto. `LOCOMOTION_PERIODIC` overlaps a physically observed controlled hop, so M5.2 multi-phase decision semantics remain unchanged. Timestamp-degraded context becomes `LOCOMOTION_AMBIGUOUS`.
+
 ## Status
 
 `IMPLEMENTED`, `SYNTHETIC_VERIFIED`, `HARDWARE_RESEARCH_INCONCLUSIVE`.

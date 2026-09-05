@@ -14,10 +14,13 @@ class JumpResearchView extends WatchUi.View {
         if (_controller == null) { return; }
         dc.drawText(center, 38, Graphics.FONT_SMALL, _controller.protocol() + " / " + _controller.profile(), Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(center, 62, Graphics.FONT_XTINY, _controller.mode(), Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(center, 88, Graphics.FONT_MEDIUM, _controller.state(), Graphics.TEXT_JUSTIFY_CENTER);
+        var stateText = _controller.state();
+        if (stateText.equals(JrConstants.STATE_COUNTDOWN)) { stateText = "GO IN " + _controller.countdownSeconds(); }
+        if (_controller.state().equals(JrConstants.STATE_RUNNING) && !_controller.markerStatus().equals("")) { stateText = _controller.markerStatus(); }
+        dc.drawText(center, 88, Graphics.FONT_MEDIUM, stateText, Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(center, 124, Graphics.FONT_XTINY, "SAMPLES " + _controller.sampleCount() + "  CAND " + _controller.confirmedCount(), Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(center, 145, Graphics.FONT_XTINY, "elapsed " + (_controller.elapsedMilliseconds() / 1000) + "s", Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(center, dc.getHeight() - 35, Graphics.FONT_XTINY, "MENU J#  UP rate  DN mode", Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(center, dc.getHeight() - 20, Graphics.FONT_XTINY, "SELECT start/stop BACK cancel", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(center, dc.getHeight() - 20, Graphics.FONT_XTINY, "SELECT start/mark BACK cancel", Graphics.TEXT_JUSTIFY_CENTER);
     }
 }
