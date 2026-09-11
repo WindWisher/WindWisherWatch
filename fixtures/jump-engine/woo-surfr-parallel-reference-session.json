@@ -1,0 +1,64 @@
+{
+  "fixtureSchemaVersion": "1.0.0",
+  "fixtureKind": "sanitized-parallel-external-jump-reference",
+  "evidenceStatus": "VERIFIED_CAPTURE_EXPLORATORY_ALIGNMENT",
+  "referenceRole": "EMPIRICAL_COMPARISON_NOT_GROUND_TRUTH",
+  "sources": ["WOO_BOARD_SENSOR", "SURFR_GARMIN_FIT"],
+  "counts": {
+    "woo": 109,
+    "surfr": 117
+  },
+  "woo": {
+    "maximumHeightMeters": 6.32672119140625,
+    "averageHeightMeters": 3.9706450296104503,
+    "totalHeightMeters": 432.80030822753906,
+    "maximumAirtimeSeconds": 5.292755126953125,
+    "lastEventOffsetSeconds": 8880.9,
+    "airRecords": 109,
+    "completeQhDataBlobs": 109,
+    "completeRawDataStaticBlobs": 3
+  },
+  "surfr": {
+    "maximumHeightMeters": 6.416471004486084,
+    "averageHeightMeters": 4.268045902252197,
+    "totalHeightMeters": 499.3613586425781,
+    "maximumAirtimeSeconds": 6.929999828338623,
+    "durationSeconds": 9256.877
+  },
+  "clockAlignment": {
+    "model": "surfrElapsedSeconds = intercept + slope * wooElapsedSeconds",
+    "interceptSeconds": -2.7968791262328523,
+    "slope": 1.0000626729408724,
+    "fittedOnSameSession": true,
+    "method": "MONOTONIC_ONE_TO_ONE_MAX_COUNT_THEN_MIN_TIME_ERROR"
+  },
+  "primaryExploratoryComparison": {
+    "maximumMatchDeltaSeconds": 1.5,
+    "matchedEvents": 100,
+    "surfrUnmatchedEvents": 17,
+    "wooUnmatchedEvents": 9,
+    "timeMeanAbsoluteErrorSeconds": 0.5214248443079893,
+    "heightMeanAbsoluteDifferenceMeters": 0.5469040441513061,
+    "heightBiasWooMinusSurfrMeters": -0.3766651964187622
+  },
+  "strictAirtimeComparison": {
+    "maximumMatchDeltaSeconds": 1.0,
+    "matchedEvents": 90,
+    "airtimeMeanAbsoluteDifferenceSeconds": 0.7412517733044095,
+    "airtimeBiasWooMinusSurfrSeconds": -0.7201995929082234
+  },
+  "privacy": {
+    "containsAbsoluteTimestamps": false,
+    "containsCoordinates": false,
+    "containsAccountIdentifiers": false,
+    "containsRawSensorSamples": false
+  },
+  "limitations": [
+    "SINGLE_SESSION",
+    "ALIGNMENT_FITTED_ON_EVALUATED_SESSION",
+    "DIFFERENT_RECORDING_WINDOWS",
+    "NO_WINDWISHER_WATCH_CAPTURE",
+    "NO_PHYSICAL_GROUND_TRUTH",
+    "VENDOR_ALGORITHMS_UNKNOWN"
+  ]
+}

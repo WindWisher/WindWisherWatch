@@ -1,0 +1,56 @@
+{
+  "fixtureSchemaVersion": "1.0.0",
+  "fixtureKind": "sanitized-external-jump-reference",
+  "source": "SURFR_GARMIN_FIT",
+  "evidenceStatus": "VERIFIED_FOR_ONE_IMPORTED_SESSION",
+  "referenceRole": "EMPIRICAL_COMPARATOR_NOT_GROUND_TRUTH",
+  "deviceClass": "GARMIN_FENIX_7",
+  "softwareProfile": "TheSurfrApp_100_3.0.16",
+  "session": {
+    "durationSeconds": 9256.877,
+    "distanceKilometers": 58.8719,
+    "averageSpeedKilometersPerHour": 22.896,
+    "maximumSpeedKilometersPerHour": 40.0752,
+    "declaredInternalSampleRateHertz": 100,
+    "fitRecordRateApproxHertz": 1,
+    "minimumHeightMeters": 1.5,
+    "jumpCount": 117,
+    "maximumHeightMeters": 6.416471004486084,
+    "averageHeightMeters": 4.268045902252197,
+    "totalHeightMeters": 499.3613586425781,
+    "maximumAirtimeSeconds": 6.929999828338623,
+    "maximumJumpDistanceMeters": 54.34001922607422,
+    "maximumPerJumpSpeedKilometersPerHour": 39.16651382446289
+  },
+  "firstJump": {
+    "elapsedSeconds": 135,
+    "heightMeters": 2.520280122756958,
+    "airtimeSeconds": 3.2899999618530273,
+    "distanceMeters": 12.583574295043945,
+    "maximumSpeedKilometersPerHour": 24.3195161819458
+  },
+  "mobileDisplay": {
+    "jumpCount": 117,
+    "maximumHeightMeters": 6.4,
+    "maximumAirtimeSeconds": 6.9,
+    "maximumJumpDistanceMeters": 54,
+    "maximumSpeedKilometersPerHour": 40,
+    "firstJumpHeightMeters": 2.52,
+    "firstJumpAirtimeSeconds": 3.29,
+    "firstJumpDistanceMeters": 13,
+    "firstJumpElapsedLabel": "2m 15s"
+  },
+  "privacy": {
+    "containsAbsoluteTimestamps": false,
+    "containsCoordinates": false,
+    "containsAccountIdentifiers": false,
+    "containsRawSensorSamples": false
+  },
+  "limitations": [
+    "SINGLE_SESSION",
+    "NO_SIMULTANEOUS_WINDWISHER_CAPTURE",
+    "NO_PHYSICAL_GROUND_TRUTH",
+    "NO_FULL_RATE_RAW_IMU",
+    "VENDOR_ALGORITHM_UNKNOWN"
+  ]
+}
