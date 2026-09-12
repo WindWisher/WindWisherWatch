@@ -13,4 +13,5 @@ research/garmin/results/*
 .env
 .env.*
 research/garmin/jump-engine/results/
+tools/jump-engine/WWJumpResearch.TXT
 !.env.example
