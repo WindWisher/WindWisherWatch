@@ -6,6 +6,8 @@ export const MarkerType = Object.freeze({
 });
 
 export const ExpectedEventType = Object.freeze({
+  OPERATOR_COUNT_ONLY: "OPERATOR_COUNT_ONLY",
+  SYNCHRONIZATION_ONLY: "SYNCHRONIZATION_ONLY",
   NONE: "NONE",
   CONTROLLED_HOP: "CONTROLLED_HOP",
 });
@@ -83,6 +85,10 @@ export function validateOperatorReference(reference) {
 
 export function referenceWindows(reference) {
   validateOperatorReference(reference);
+  if (reference.expectedEventType === ExpectedEventType.OPERATOR_COUNT_ONLY)
+    throw new Error("Operator counts do not establish event timing");
+  if (reference.expectedEventType === ExpectedEventType.SYNCHRONIZATION_ONLY)
+    throw new Error("Synchronization pilot is not jump validation evidence");
   if (reference.expectedEventType === ExpectedEventType.NONE) return [];
   const postMarkers = reference.markers.filter(
     (marker) => marker.markerType === MarkerType.POST_EVENT_MARK,
@@ -142,6 +148,10 @@ export function alignOperatorReference({
 }) {
   validateOperatorReference(reference);
   finiteNonNegative(sampleIntervalMilliseconds, "sample interval");
+  if (reference.expectedEventType === ExpectedEventType.OPERATOR_COUNT_ONLY)
+    throw new Error("Operator counts do not establish event timing");
+  if (reference.expectedEventType === ExpectedEventType.SYNCHRONIZATION_ONLY)
+    throw new Error("Synchronization pilot is not jump validation evidence");
   const detections = candidates
     .map((candidate) =>
       candidateInterval(candidate, sampleIntervalMilliseconds),

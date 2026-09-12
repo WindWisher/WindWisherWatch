@@ -8,6 +8,7 @@ import {
   MarkerType,
   MAX_OPERATOR_MARKERS,
   validateOperatorReference,
+  referenceWindows,
 } from "./operator-reference.mjs";
 
 function reference(overrides = {}) {
@@ -39,6 +40,30 @@ function candidate(id, takeoff, landing) {
     landingMilliseconds: landing,
   };
 }
+
+test("operator-count-only trials cannot be evaluated as timed matches", () => {
+  const value = reference({
+    expectedEventType: ExpectedEventType.OPERATOR_COUNT_ONLY,
+  });
+  assert.equal(validateOperatorReference(value), value);
+  assert.throws(() => referenceWindows(value), /do not establish event timing/);
+  assert.throws(
+    () => alignOperatorReference({ reference: value, candidates: [] }),
+    /do not establish event timing/,
+  );
+});
+
+test("synchronization-only reference cannot become jump validation evidence", () => {
+  const value = reference({
+    expectedEventType: ExpectedEventType.SYNCHRONIZATION_ONLY,
+  });
+  assert.equal(validateOperatorReference(value), value);
+  assert.throws(() => referenceWindows(value), /not jump validation/);
+  assert.throws(
+    () => alignOperatorReference({ reference: value, candidates: [] }),
+    /not jump validation/,
+  );
+});
 
 test("reference serialization is bounded and validates monotonic markers", () => {
   const value = reference();

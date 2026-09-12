@@ -12,6 +12,7 @@ class JrController {
     private var _writer;
     private var _timer;
     private var _source = null;
+    private var _packed = null;
     private var _state = JrConstants.STATE_IDLE;
     private var _profileIndex = 0;
     private var _modeIndex = 0;
@@ -40,7 +41,7 @@ class JrController {
     function state() { return _state; }
     function profile() { return PROFILES[_profileIndex]; }
     function mode() { return MODES[_modeIndex]; }
-    function protocol() { return PROTOCOLS[_protocolIndex]; }
+    function protocol() { return _protocolIndex == 0 ? JrConstants.DIAGNOSTIC_PROTOCOL : PROTOCOLS[_protocolIndex - 1]; }
     function sampleCount() { return _source == null ? 0 : _source.sequence(); }
     function confirmedCount() { return _source == null ? 0 : _source.detector().confirmed(); }
     function elapsedMilliseconds() {
@@ -55,6 +56,7 @@ class JrController {
     function markerStatus() { return _state.equals(JrConstants.STATE_RUNNING) && _postEventMarked ? "MARKED" : ""; }
     function expectsHop() {
         var value = protocol();
+        if (value.equals(JrConstants.DIAGNOSTIC_PROTOCOL)) { return true; }
         return value.equals("AT3") || value.equals("AT4") || value.equals("AT5") || value.equals("HP1") || value.equals("HP2") || value.equals("HP3") || value.equals("HP4") || value.equals("BT1") || value.equals("BT3") || value.equals("BT4") || value.equals("BP1") || value.equals("BP2") || value.equals("BP3") || value.equals("BP4");
     }
     function datasetSplit() {
@@ -76,7 +78,7 @@ class JrController {
 
     function nextProtocol() {
         if (!_state.equals(JrConstants.STATE_IDLE)) { return; }
-        _protocolIndex = (_protocolIndex + 1) % PROTOCOLS.size();
+        _protocolIndex = (_protocolIndex + 1) % (PROTOCOLS.size() + 1);
         WatchUi.requestUpdate();
     }
 
@@ -87,6 +89,7 @@ class JrController {
 
     function start() {
         if (!_state.equals(JrConstants.STATE_IDLE)) { return false; }
+        if (protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL) && (!profile().equals("MEDIUM") || !mode().equals(JrConstants.MODE_CONTROLLED_FULL_WINDOW))) { return false; }
         var maximumRate = 0;
         try {
             if (Sensor has :getMaxSampleRateForSensorType) {
@@ -103,14 +106,22 @@ class JrController {
         // transition-related false positive can be inspected after the real
         // operator-observed hop. Other protocols still freeze on the first.
         _source = new JrMotionSource(profile(), mode(), _rate, 1);
+        if (protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL)) {
+            if (_rate != 25) { _state = JrConstants.STATE_FAILED; return false; }
+            _source.enableDiagnostic();
+        }
+        _packed = null;
         _trialStartedAt = JrClock.now();
         _countdownEndsAt = _trialStartedAt + JrConstants.COUNTDOWN_MILLISECONDS;
         _experimentId = "jr-" + Time.now().value() + "-" + _trialStartedAt;
-        _operatorReference = new JrOperatorReference(_experimentId, datasetSplit(), expectsHop() ? "CONTROLLED_HOP" : "NONE");
+        var expectedEvent = protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL) ? "OPERATOR_COUNT_ONLY" : (expectsHop() ? "CONTROLLED_HOP" : "NONE");
+        _operatorReference = new JrOperatorReference(_experimentId, datasetSplit(), expectedEvent);
         _operatorReference.add("TRIAL_START", 0, null, null, 0, 0, "OPERATOR_START_BUTTON");
         if (!expectsHop()) { _operatorReference.add("NEGATIVE_TRIAL", 0, null, null, 0, 0, "PREDECLARED_PROTOCOL"); }
         _postEventMarked = false;
         _stopAfter = null;
+        // Fixed observation; actual operator hop count is reported offline.
+        if (protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL)) { _stopAfter = JrConstants.DIAGNOSTIC_OBSERVATION_MILLISECONDS; }
         _state = JrConstants.STATE_COUNTDOWN;
         _timer.start(method(:onTick), JrConstants.TIMER_INTERVAL_MILLISECONDS, true);
         WatchUi.requestUpdate();
@@ -123,7 +134,12 @@ class JrController {
         } else if (_state.equals(JrConstants.STATE_RUNNING)) {
             var limit = mode().equals(JrConstants.MODE_CONTROLLED_FULL_WINDOW) ? JrConstants.MAX_CONTROLLED_DURATION_MILLISECONDS : JrConstants.MAX_RESEARCH_DURATION_MILLISECONDS;
             var elapsed = JrClock.elapsed(_startedAt, JrClock.now());
-            if (_source.limitReached() || elapsed >= limit || (_stopAfter != null && elapsed >= _stopAfter)) { beginExport(JrConstants.STATE_COMPLETED); }
+            var tailReady = _stopAfter != null && elapsed >= _stopAfter;
+            if (protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL)) {
+                limit = JrConstants.DIAGNOSTIC_DURATION;
+                tailReady = JrDiagnosticTail.complete(_stopAfter, elapsed, _source.lastNormalizedTimestamp());
+            }
+            if (_source.limitReached() || elapsed >= limit || tailReady) { beginExport(JrConstants.STATE_COMPLETED); }
         } else if (_state.equals(JrConstants.STATE_EXPORTING)) { drainExport(); }
         WatchUi.requestUpdate();
     }
@@ -131,7 +147,7 @@ class JrController {
     function beginCapture() {
         _startedAt = JrClock.now();
         _startMemory = System.getSystemStats();
-        _writer.manifest(_experimentId, protocol(), profile(), mode(), _rate, _maximumRate, System.getDeviceSettings());
+        if (!protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL)) { _writer.manifest(_experimentId, protocol(), profile(), mode(), _rate, _maximumRate, System.getDeviceSettings()); }
         try { _source.start(); }
         catch (ex) { _state = JrConstants.STATE_FAILED; _timer.stop(); WatchUi.requestUpdate(); return; }
         _operatorReference.add("GO_SIGNAL", 0, 0, 0, 0, 500, "COUNTDOWN_GO_SENSOR_REGISTRATION");
@@ -140,7 +156,7 @@ class JrController {
 
     function stop() {
         if (_state.equals(JrConstants.STATE_RUNNING)) {
-            if (expectsHop() && !_postEventMarked) {
+            if (expectsHop() && !protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL) && !_postEventMarked) {
                 var timestamp = JrClock.elapsed(_startedAt, JrClock.now());
                 _operatorReference.add("POST_EVENT_MARK", timestamp, _source.lastNormalizedTimestamp(), _source.sequence(), JrConstants.POST_MARK_UNCERTAINTY_BEFORE_MILLISECONDS, JrConstants.POST_MARK_UNCERTAINTY_AFTER_MILLISECONDS, "OPERATOR_POST_EVENT_BUTTON");
                 _postEventMarked = true;
@@ -148,7 +164,9 @@ class JrController {
                 WatchUi.requestUpdate();
                 return true;
             }
-            beginExport(JrConstants.STATE_COMPLETED); return true;
+            // A second SELECT must not truncate the diagnostic post-marker tail.
+            if (!protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL)) { beginExport(JrConstants.STATE_COMPLETED); }
+            return true;
         }
         return false;
     }
@@ -164,11 +182,36 @@ class JrController {
         _source.stop();
         _endMemory = System.getSystemStats();
         _result = result;
+        if (protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL)) {
+            _result = JrDiagnosticTail.result(result, _stopAfter, _captureDuration, _source.lastNormalizedTimestamp());
+            if (_result.equals(JrConstants.STATE_COMPLETED)
+                && (!JrDiagnosticTail.samplesValid(_source.buffer()) || _source.diagnosticDiscarded() != 0)) {
+                _result = JrConstants.STATE_INCOMPLETE;
+            }
+        }
         _exportIndex = 0;
         _state = JrConstants.STATE_EXPORTING;
+        if (protocol().equals(JrConstants.DIAGNOSTIC_PROTOCOL)) {
+            try {
+                _packed = new JrPackedExport();
+                if (!_packed.prepare(_experimentId, _source, _operatorReference, _captureDuration, _result)) { _state = JrConstants.STATE_FAILED; _timer.stop(); }
+            } catch (ex) { _state = JrConstants.STATE_FAILED; _timer.stop(); }
+        }
     }
 
     function drainExport() {
+        if (_packed != null) {
+            if (!_packed.ready()) {
+                try {
+                    if (!_packed.step()) { _state = JrConstants.STATE_FAILED; _timer.stop(); }
+                } catch (ex) { _state = JrConstants.STATE_FAILED; _timer.stop(); }
+                return;
+            }
+            _writer.emit(_packed.line(_exportIndex));
+            _exportIndex += 1;
+            if (_exportIndex >= _packed.size()) { _timer.stop(); _state = _result; _timer.start(method(:reset), 8000, false); }
+            return;
+        }
         var buffer = _source.buffer();
         var emitted = 0;
         while (_exportIndex < buffer.size() && emitted < JrConstants.EXPORT_RECORDS_PER_TICK && _exportIndex < JrConstants.MAX_EXPORT_RECORDS) {

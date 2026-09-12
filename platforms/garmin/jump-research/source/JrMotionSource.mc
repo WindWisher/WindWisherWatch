@@ -16,6 +16,8 @@ class JrMotionSource {
     private var _postCandidateUntil = null;
     private var _limitReached = false;
     private var _freezeAfterConfirmed = 1;
+    private var _diagnostic = false;
+    private var _diagnosticDiscarded = 0;
 
     function initialize(profile, mode, rate, freezeAfterConfirmed) {
         _profile = profile;
@@ -40,6 +42,11 @@ class JrMotionSource {
         Sensor.registerSensorDataListener(method(:onSensorData), options);
         _running = true;
     }
+    function enableDiagnostic() {
+        _diagnostic = true;
+        _buffer = new JrCaptureBuffer(JrConstants.DIAGNOSTIC_SAMPLES);
+        _buffer.reset(false);
+    }
 
     function stop() {
         if (!_running) { return; }
@@ -57,6 +64,7 @@ class JrMotionSource {
         var accelTimes = (accel != null && accel has :timestamp) ? accel.timestamp : null;
         var gyroTimes = (gyro != null && gyro has :timestamp) ? gyro.timestamp : null;
         for (var index = 0; index < batchSize; index += 1) {
+            if (_diagnostic && _sequence >= JrConstants.DIAGNOSTIC_SAMPLES) { _diagnosticDiscarded += batchSize - index; _limitReached = true; break; }
             var rawTimestamp = accelTimes == null ? null : accelTimes[index];
             var gyroTimestamp = (gyroTimes == null || index >= gyroTimes.size()) ? null : gyroTimes[index];
             var quality = 0;
@@ -105,8 +113,10 @@ class JrMotionSource {
                 // duration bound and expose every rejected raw sample via the
                 // buffer's deterministic dropped counter.
                 _buffer.append(_sequence, rawTimestamp, gyroTimestamp, callbackStart, normalized, accel.x[index], accel.y[index], accel.z[index], gx, gy, gz, quality);
+                if (_diagnostic) { _buffer.setLastState(_detector.stateCode()); }
             }
             _sequence += 1;
+            if (_diagnostic && _sequence == JrConstants.DIAGNOSTIC_SAMPLES) { _limitReached = true; }
         }
         var callbackEnd = JrClock.now();
         _stats.observeCallback(callbackStart, callbackEnd, batchSize);
@@ -124,5 +134,6 @@ class JrMotionSource {
     function mode() { return _mode; }
     function limitReached() { return _limitReached; }
     function sequence() { return _sequence; }
+    function diagnosticDiscarded() { return _diagnosticDiscarded; }
     function lastNormalizedTimestamp() { return _lastNormalizedTimestamp; }
 }

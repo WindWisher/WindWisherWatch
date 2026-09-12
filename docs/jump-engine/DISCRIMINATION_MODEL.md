@@ -22,7 +22,7 @@ A peak is never sufficient. A confirmed candidate requires, in timestamp order:
 2. a low-g transition within 360 ms of the most recent plausible impulse;
 3. at least 120 ms of genuinely consecutive low-g evidence;
 4. at least 240 ms from low-g entry to landing impulse;
-5. takeoff/landing direction cosine of at least 0.90;
+5. phase-scoped takeoff peak at least 3000 mg and flight minimum at most 408 mg on Garmin (host uses 4 m/s²);
 6. grounded stabilization after landing.
 
 The initial candidate remains bounded to 1,000 ms even when a newer impulse rebases the transition window. All temporal decisions use normalized milliseconds. Only smoothing storage differs by profile: three samples at MEDIUM and five at HIGH.
@@ -30,6 +30,8 @@ The initial candidate remains bounded to 1,000 ms even when a newer impulse reba
 These values are experimental guards, not sport constants. Airtime remains the difference between low-g entry and landing impulse and is `UNVALIDATED`.
 
 ## Typed explanation
+
+Direction cosine is supporting evidence, not a required gate in the current M5.4B implementation. The earlier mandatory-direction statement was stale. See the AT2 fixture provenance audit before interpreting synthetic regressions as physical replay.
 
 Candidates retain bounded typed reason codes including `TAKEOFF_IMPULSE_FOUND`, `TAKEOFF_IMPULSE_UPDATED`, `LOW_G_PHASE_FOUND`, `LOW_G_DURATION_PLAUSIBLE`, `LOW_G_TOO_BRIEF`, `LANDING_IMPULSE_FOUND`, `LANDING_STABLE`, `LANDING_NOT_STABLE`, `FLIGHT_DURATION_PLAUSIBLE`, `NO_FLIGHT_PHASE`, `IMPACT_ONLY`, `IMPULSE_DIRECTION_CONSISTENT`, `ARM_MOTION_PATTERN`, `GYRO_CORRUPTED`, `TIMESTAMP_DEGRADED` and `SESSION_ENDED`.
 

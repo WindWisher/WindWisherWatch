@@ -250,6 +250,29 @@ test("HP4-like brisk walking transition preserves the phase-scoped hop", () => {
   );
 });
 
+test("lowering takeoff peak alone revives the synthetic walking false positive", () => {
+  // Offline counterfactual only; never changes the default or hardware config.
+  for (const profile of ["MEDIUM", "HIGH"]) {
+    for (const threshold of [3000, 2350]) {
+      const engine = new ExperimentalJumpEngine({
+        sessionId: "weak-takeoff-counterfactual",
+        profile,
+        config: {
+          takeoffPeakThresholdMillig: threshold,
+          minimumTakeoffPeakMps2: threshold * 0.00980665,
+        },
+      });
+      for (const sample of generated(
+        "brisk-walking-false-positive-envelope-v1",
+        profile,
+      ).samples)
+        engine.process(sample);
+      engine.endSession();
+      assert.equal(engine.totalConfirmedCandidates, threshold === 3000 ? 0 : 1);
+    }
+  }
+});
+
 test("canonical 3000 mg takeoff threshold converts without rounding", () => {
   const engine = new ExperimentalJumpEngine({ sessionId: "threshold-units" });
   assert.equal(engine.config.takeoffPeakThresholdMillig, 3000);

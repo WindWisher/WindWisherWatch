@@ -61,6 +61,7 @@ class JrDetector {
     private var _takeoffZ = 0.0;
     private var _landingDirectionCosine = null;
     private var _traces = [];
+    private var _compactTraces = [];
     private var _traceStatuses = [];
     private var _traceWriteIndex = 0;
     private var _locomotion;
@@ -275,14 +276,22 @@ class JrDetector {
             + ",\"postIntervalMeanMilliseconds\":" + value(_locomotion.intervalMean(postStart, endTime)) + ",\"postIntervalCoefficientOfVariation\":" + value(_locomotion.intervalCv(postStart, endTime))
             + ",\"postState\":\"" + _locomotion.state(postStart, endTime) + "\"}"
             + ",\"endMilliseconds\":" + endTime + "}";
-        retainTrace(trace, status);
+        var compact = "[" + _activeCandidateId + "," + (status.equals("CONFIRMED") ? 1 : 0)
+            + "," + value(_candidateStarted) + "," + value(_takeoff) + "," + value(_landing) + "," + endTime
+            + "," + _reasonMask + "," + _qualityMask + "," + value(_decisionTakeoffPeakAccel)
+            + "," + value(_decisionFlightMinimumAccel) + "," + value(_decisionLandingPeakAccel)
+            + "," + value(_decisionFlightDuration) + "," + value(_decisionSustainedLowG)
+            + "," + (_decisionEnvelopeMatched ? 1 : 0) + "," + value(_postEventPeakAccel)
+            + "," + (_landingStable ? 1 : 0) + "]";
+        retainTrace(trace, status, compact);
         resetState();
         return status.equals("CONFIRMED") ? 1 : -1;
     }
 
-    function retainTrace(trace, status) {
+    function retainTrace(trace, status, compact) {
         if (_traces.size() < JrConstants.MAX_CANDIDATES) {
             _traces.add(trace);
+            _compactTraces.add(compact);
             _traceStatuses.add(status);
             return;
         }
@@ -293,6 +302,7 @@ class JrDetector {
         }
         if (replacement == null) { return; }
         _traces[replacement] = trace;
+        _compactTraces[replacement] = compact;
         _traceStatuses[replacement] = status;
         _traceWriteIndex = (replacement + 1) % JrConstants.MAX_CANDIDATES;
     }
@@ -318,6 +328,12 @@ class JrDetector {
     }
 
     function confirmed() { return _confirmed; }
+    function stateCode() { return _state + (_landingStable ? 4 : 0); }
+    function compactTracesJson() {
+        var result = "[";
+        for (var i = 0; i < _compactTraces.size(); i += 1) { if (i > 0) { result += ","; } result += _compactTraces[i]; }
+        return result + "]";
+    }
     function rejected() { return _rejected; }
     function candidateCount() { return _candidateCount; }
     function lastAirtime() { return _lastAirtime; }

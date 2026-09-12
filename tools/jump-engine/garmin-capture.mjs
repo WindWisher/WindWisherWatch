@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import readline from "node:readline";
+import { decodePackedMotion, expandCandidate } from "./packed-motion.mjs";
 import { replaySamples } from "./replay.mjs";
 import {
   alignOperatorReference,
@@ -61,7 +62,7 @@ export async function parseGarminResearchCapture(input) {
   let completion = null;
   const samples = [];
   let expectedSequence = null;
-  for await (const rawLine of lines(input)) {
+  for await (const rawLine of expandedLines(input)) {
     const content = rawLine.startsWith(PREFIX)
       ? rawLine.slice(PREFIX.length)
       : rawLine;
@@ -76,7 +77,11 @@ export async function parseGarminResearchCapture(input) {
     }
     if (record.recordType === "manifest") {
       if (manifest) throw new Error("Garmin research manifest is duplicated");
-      if (!["1.0.0", "1.1.0", "1.2.0"].includes(record.researchSchemaVersion))
+      if (
+        !["1.0.0", "1.1.0", "1.2.0", "1.3.0"].includes(
+          record.researchSchemaVersion,
+        )
+      )
         throw new Error("Unsupported Garmin research capture version");
       if (!["MEDIUM", "HIGH"].includes(record.sensorProfile))
         throw new Error("Unsupported Garmin research sensor profile");
@@ -110,6 +115,10 @@ export async function parseGarminResearchCapture(input) {
       if (!manifest || summary || completion)
         throw new Error("Garmin research summary order is invalid");
       summary = record;
+      if (manifest.researchSchemaVersion === "1.3.0") {
+        summary.detector.candidateTraces =
+          summary.detector.compactCandidateTraces.map(expandCandidate);
+      }
     } else if (record.recordType === "completion") {
       if (!summary || completion)
         throw new Error("Garmin research completion order is invalid");
@@ -122,7 +131,163 @@ export async function parseGarminResearchCapture(input) {
     throw new Error("Garmin research completion count does not match capture");
   if (summary.operatorReference)
     validateOperatorReference(summary.operatorReference);
+  if (manifest.researchSchemaVersion === "1.3.0") {
+    const noVideo = [
+      "0.5.1-m5.4bd-novideo1",
+      "0.5.1-m5.4bd-novideo1-export1",
+    ].includes(manifest.appVersion);
+    const negative =
+      noVideo || manifest.appVersion === "0.5.1-m5.4bd-negative1";
+    const synchronization = manifest.appVersion === "0.5.1-m5.4bd-sync1";
+    const countOnly = manifest.appVersion === "0.5.1-m5.4bd-novideo2";
+    if (
+      !(countOnly ||
+      negative ||
+      synchronization ||
+      manifest.appVersion === "0.5.1-m5.4bd-window1"
+        ? manifest.encoding === "LE19_DELTA_ACCEL_STATE_V1" &&
+          manifest.limits?.maxSamples === 225 &&
+          manifest.limits?.maxDurationMilliseconds === 12000
+        : manifest.encoding === "LE26_ACCEL_STATE_V1") ||
+      manifest.sensorProfile !== "MEDIUM" ||
+      manifest.captureMode !== "CONTROLLED_FULL_WINDOW" ||
+      manifest.protocolId !==
+        (countOnly
+          ? "M54BD_NV_HOP_01"
+          : noVideo
+            ? "M54BD_NV_ARM_01"
+            : synchronization
+              ? "M54BD_SYNC_01"
+              : negative
+                ? "M54BD_WALK_NEG_01"
+                : "M54BD_BT4_DIAG_01") ||
+      manifest.jumpAlgorithmVersion !==
+        "experimental-0.5-phase-scoped-envelope" ||
+      ![
+        "0.5.1-m5.4bd",
+        "0.5.1-m5.4bd-tail1",
+        "0.5.1-m5.4bd-window1",
+        "0.5.1-m5.4bd-negative1",
+        "0.5.1-m5.4bd-sync1",
+        "0.5.1-m5.4bd-novideo1",
+        "0.5.1-m5.4bd-novideo1-export1",
+        "0.5.1-m5.4bd-novideo2",
+      ].includes(manifest.appVersion)
+    )
+      throw new Error("Unexpected diagnostic identity");
+    if (
+      !samples.length ||
+      samples[0].sequence !== 0 ||
+      samples.length !== summary.observedSamples ||
+      samples.length !== summary.exportedSamples ||
+      summary.overwrittenOrDroppedSamples !== 0 ||
+      summary.unprocessedDeliveredSamples !== 0 ||
+      completion.result !== "COMPLETED" ||
+      summary.result !== "COMPLETED"
+    )
+      throw new Error("Incomplete diagnostic capture");
+    if (
+      negative &&
+      (summary.operatorReference?.expectedEventType !== "NONE" ||
+        summary.operatorReference?.datasetSplit !== "TUNING" ||
+        !summary.operatorReference?.markers.some(
+          (m) =>
+            m.markerType === "NEGATIVE_TRIAL" &&
+            m.provenance === "PREDECLARED_PROTOCOL",
+        ) ||
+        summary.operatorReference?.markers.some(
+          (m) => m.markerType === "POST_EVENT_MARK",
+        ))
+    )
+      throw new Error("Invalid negative diagnostic reference");
+    if (
+      !negative &&
+      !countOnly &&
+      !synchronization &&
+      !summary.operatorReference?.markers.some(
+        (m) => m.markerType === "POST_EVENT_MARK",
+      )
+    )
+      throw new Error("Diagnostic marker missing");
+    const mark = summary.operatorReference.markers.find(
+      (m) => m.markerType === "POST_EVENT_MARK",
+    );
+    if (
+      (synchronization || countOnly) &&
+      (summary.operatorReference?.expectedEventType !==
+        (countOnly ? "OPERATOR_COUNT_ONLY" : "SYNCHRONIZATION_ONLY") ||
+        summary.operatorReference?.datasetSplit !== "TUNING" ||
+        !summary.operatorReference?.markers.some(
+          (m) =>
+            m.markerType === "TRIAL_START" &&
+            m.provenance === "OPERATOR_START_BUTTON",
+        ) ||
+        summary.operatorReference?.markers.some(
+          (m) =>
+            m.markerType === "POST_EVENT_MARK" ||
+            m.markerType === "NEGATIVE_TRIAL",
+        ))
+    )
+      throw new Error("Invalid synchronization-only reference");
+    const requiredEnd =
+      synchronization || noVideo || countOnly
+        ? 8000
+        : negative
+          ? 6000
+          : mark.timestampMilliseconds + 2000;
+    if (
+      !Number.isFinite(summary.durationMilliseconds) ||
+      summary.durationMilliseconds < requiredEnd
+    )
+      throw new Error("Diagnostic post-marker tail incomplete");
+    // Normalized zero starts at the first acquired sample, not at the marker's
+    // most recently delivered (potentially stale) sample. This is conservative.
+    if (
+      samples[0].normalizedTimestamp !== 0 ||
+      samples.some(
+        (s) =>
+          s.rawSampleTimestamp !== s.normalizedTimestamp ||
+          (s.qualityMask & 5) !== 0,
+      )
+    )
+      throw new Error("Diagnostic sample clock cannot establish tail coverage");
+    if (samples.at(-1).normalizedTimestamp < requiredEnd)
+      throw new Error("Diagnostic delivered-sample tail incomplete");
+    for (let i = 0; i < samples.length; i++) {
+      if (
+        !samples[i].garminState ||
+        (i &&
+          samples[i].normalizedTimestamp <= samples[i - 1].normalizedTimestamp)
+      )
+        throw new Error("Invalid diagnostic sample timeline");
+    }
+  }
   return { manifest, samples, summary, completion };
+}
+
+async function* expandedLines(input) {
+  let packedAllowed = false;
+  let packedPrefix = "D|";
+  for await (const rawLine of lines(input)) {
+    const content = rawLine.startsWith(PREFIX)
+      ? rawLine.slice(PREFIX.length)
+      : rawLine;
+    if (content.startsWith("D|") || content.startsWith("E|")) {
+      if (!packedAllowed || !content.startsWith(packedPrefix))
+        throw new Error("Packed records require diagnostic manifest");
+      for (const record of decodePackedMotion(content))
+        yield JSON.stringify(record);
+    } else {
+      if (content.includes('"recordType":"manifest"')) {
+        packedAllowed = JSON.parse(content).researchSchemaVersion === "1.3.0";
+        packedPrefix =
+          JSON.parse(content).encoding === "LE19_DELTA_ACCEL_STATE_V1"
+            ? "E|"
+            : "D|";
+      }
+      yield rawLine;
+    }
+  }
 }
 
 export async function parseLatestGarminResearchCapture(input) {

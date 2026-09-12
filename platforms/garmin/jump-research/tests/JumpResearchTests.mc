@@ -1,4 +1,15 @@
 (:test)
+function noVideoHopHasSeparateIdentityAndBoundedWindow(logger) {
+    var controller = new JrController(null);
+    return controller.expectsHop()
+        && controller.protocol().equals("M54BD_NV_HOP_01")
+        && JrConstants.APP_VERSION.equals("0.5.1-m5.4bd-novideo2")
+        && JrConstants.DIAGNOSTIC_OBSERVATION_MILLISECONDS == 8000
+        && JrConstants.DIAGNOSTIC_SAMPLES == 225
+        && JrConstants.DIAGNOSTIC_DURATION == 12000;
+}
+
+(:test)
 function captureBufferNeverExceedsCapacity(logger) {
     var buffer = new JrCaptureBuffer(3);
     buffer.reset(false);
@@ -181,4 +192,85 @@ function operatorReferenceMarkersAreBounded(logger) {
     return first && second && third && fourth && !overflow
         && reference.size() == JrConstants.MAX_OPERATOR_MARKERS
         && serialized.length() > 0;
+}
+
+class PackedTestSource {
+    private var _buffer;
+    private var _stats;
+    private var _detector;
+    function initialize() {
+        _buffer = new JrCaptureBuffer(225);
+        _stats = new JrStats();
+        _detector = new JrDetector("MEDIUM");
+        for (var i = 0; i < 225; i += 1) {
+            _buffer.append(i, i * 40, null, 4000000000l + i * 40, i * 40, -123.25, 0.125, 1000.5, null, null, null, 2);
+            _buffer.setLastState(3);
+            _stats.gyroOutlier();
+        }
+        for (var cb = 0; cb < 9; cb += 1) { _stats.observeCallback(cb * 1100, cb * 1100 + 120, 25); }
+        for (var n = 0; n < 8; n += 1) {
+            _detector.observe(n * 2000, 3999.75, 0, 0, 0, null, null, null, false);
+            for (var f = 40; f < 400; f += 40) { _detector.observe(n * 2000 + f, 212.345, 0, 0, 0, null, null, null, false); }
+            _detector.observe(n * 2000 + 400, 3999.125, 0, 0, 0, null, null, null, false);
+            _detector.observe(n * 2000 + 440, 4555.875, 0, 0, 0, null, null, null, false);
+            _detector.finish();
+        }
+    }
+    function buffer() { return _buffer; }
+    function detector() { return _detector; }
+    function stats() { return _stats; }
+    function sequence() { return 225; }
+    function diagnosticDiscarded() { return 0; }
+}
+
+(:test)
+function packedDiagnosticIsBoundedAndLossless(logger) {
+    var source = new PackedTestSource();
+    var reference = new JrOperatorReference("jr-1788606843-914332807", "TUNING", "CONTROLLED_HOP");
+    reference.add("TRIAL_START", 0, null, null, 0, 0, "OPERATOR_START_BUTTON");
+    reference.add("GO_SIGNAL", 0, 0, 0, 0, 500, "COUNTDOWN_GO_SENSOR_REGISTRATION");
+    reference.add("POST_EVENT_MARK", 6000, 5000, 125, 2500, 100, "OPERATOR_POST_EVENT_BUTTON");
+    var packed = new JrPackedExport();
+    var ok = packed.prepare("jr-1788606843-914332807", source, reference, 10000, "COMPLETED");
+    if (!ok || packed.ready() || packed.size() != 1) { return false; }
+    var steps = 0;
+    while (!packed.ready() && steps < 16) {
+        var previous = packed.size();
+        if (!packed.step() || packed.size() - previous > 1) { return false; }
+        steps += 1;
+    }
+    if (!packed.ready() || steps != 14) { return false; }
+    var finalSize = packed.size();
+    if (!packed.step() || packed.size() != finalSize) { return false; }
+    logger.debug("PACKED_BYTES=" + packed.bytes());
+    logger.debug("PACKED_FREE_BYTES=" + Toybox.System.getSystemStats().freeMemory);
+    logger.debug("PACKED_GOLDEN=" + packed.motion(source.buffer(), 0, 1));
+    for (var line = 0; line < packed.size(); line += 1) { logger.debug("PACKED_LINE=" + packed.line(line)); }
+    if (!ok || packed.size() != 12 || source.buffer().size() != 225) { return false; }
+    for (var extra = 0; extra < 100; extra += 1) { packed.add("0123456789012345678901234567890123456789"); }
+    return !packed.valid();
+}
+
+(:test)
+function diagnosticTailRequiresWallAndDeliveredSamples(logger) {
+    return !JrDiagnosticTail.complete(6187, 6001, 5079)
+        && !JrDiagnosticTail.complete(5000, 5000, 4000)
+        && !JrDiagnosticTail.complete(5000, 4999, 5000)
+        && !JrDiagnosticTail.complete(null, 6000, 5960)
+        && !JrDiagnosticTail.complete(5000, 6000, null)
+        && JrDiagnosticTail.complete(5000, 5500, 5000)
+        && JrDiagnosticTail.result("COMPLETED", 6187, 6001, 5079).equals("INCOMPLETE")
+        && JrDiagnosticTail.result("COMPLETED", 5000, 5500, 5000).equals("COMPLETED")
+        && JrDiagnosticTail.result("CANCELLED", 5000, 5500, 5000).equals("CANCELLED");
+}
+
+(:test)
+function diagnosticTailRejectsDegradedClock(logger) {
+    var good = new PackedTestSource();
+    if (!JrDiagnosticTail.samplesValid(good.buffer())) { return false; }
+    var bad = new JrCaptureBuffer(2);
+    bad.reset(false);
+    if (JrDiagnosticTail.samplesValid(bad)) { return false; }
+    bad.append(0, null, null, 4000000, 4000000, 0, 0, 1000, null, null, null, 1);
+    return !JrDiagnosticTail.samplesValid(bad);
 }

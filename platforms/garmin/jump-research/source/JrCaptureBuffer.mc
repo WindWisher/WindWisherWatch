@@ -12,6 +12,7 @@ class JrCaptureBuffer {
     private var _gy;
     private var _gz;
     private var _quality;
+    private var _states;
     private var _start = 0;
     private var _size = 0;
     private var _dropped = 0;
@@ -27,6 +28,7 @@ class JrCaptureBuffer {
         _ax = new [capacity]; _ay = new [capacity]; _az = new [capacity];
         _gx = new [capacity]; _gy = new [capacity]; _gz = new [capacity];
         _quality = new [capacity];
+        _states = new [capacity];
     }
 
     function reset(circular) {
@@ -61,6 +63,8 @@ class JrCaptureBuffer {
     }
 
     function size() { return _size; }
+    function setLastState(state) { if (_size > 0) { _states[(_start + _size - 1) % _capacity] = state; } }
+    function stateAt(index) { return _states[(_start + index) % _capacity]; }
     function capacity() { return _capacity; }
     function dropped() { return _dropped; }
 }

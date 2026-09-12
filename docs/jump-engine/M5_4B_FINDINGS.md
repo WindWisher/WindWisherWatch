@@ -1,5 +1,7 @@
 # M5.4B Phase-Scoped Features and Decision Snapshot — Findings
 
+Current M5.4B-D evidence: clean-start window1 DIAG_01 has 175 complete samples, accepted strict replay and zero host/Garmin state mismatches. Its flight-bearing candidate fails the 3000 mg takeoff envelope at 2354.51 mg. An offline 2350 mg counterfactual accepts it but revives the synthetic brisk-walking false positive under both profiles; threshold-only repair is rejected. No detector/default or installed binary change. Exact physical alignment and general discrimination remain unresolved; M6 stays NO_GO. See [current BT4 diagnostic evidence and preparation history](BT4_DIAGNOSTIC_CAPTURE.md).
+
 ## M5.4B-T follow-up
 
 The terminal timestamp cause is confirmed: Garmin stop flush used the last takeoff impulse (`_stateStarted`). It now uses the latest observed normalized sample. Host checks pass (88 tests). After user authorization for temporary signing, fenix7/fenix7s builds and all 14 Garmin tests pass. Run No Evil logical PASS is recorded separately from process exit 1. No new watch binary was installed. See [timestamp integrity report](CANDIDATE_TIMESTAMP_INTEGRITY.md). Integrity is VERIFIED for tested normalized-input paths; pre-freeze decision remains MORE_DIAGNOSTIC_EVIDENCE_REQUIRED. Historic misses are unchanged.

@@ -1,5 +1,11 @@
 module JrConstants {
-    const APP_VERSION = "0.5.0-m5.4b";
+    const APP_VERSION = "0.5.1-m5.4bd-novideo2";
+    const DIAGNOSTIC_PROTOCOL = "M54BD_NV_HOP_01";
+    const DIAGNOSTIC_LABEL = "NV HOP";
+    const DIAGNOSTIC_OBSERVATION_MILLISECONDS = 8000;
+    const DIAGNOSTIC_SAMPLES = 225;
+    const DIAGNOSTIC_DURATION = 12000;
+    const DIAGNOSTIC_EXPORT_BUDGET = 9500;
     const SCHEMA_VERSION = "1.2.0";
     const ALGORITHM_VERSION = "experimental-0.5-phase-scoped-envelope";
     const PROFILE_VERSION = "garmin-research-0.1";
@@ -10,6 +16,7 @@ module JrConstants {
     const STATE_RUNNING = "RUNNING";
     const STATE_EXPORTING = "EXPORTING";
     const STATE_COMPLETED = "COMPLETED";
+    const STATE_INCOMPLETE = "INCOMPLETE";
     const STATE_CANCELLED = "CANCELLED";
     const STATE_FAILED = "FAILED";
 
