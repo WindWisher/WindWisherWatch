@@ -9,6 +9,7 @@ class SessionDevController {
     private var _timer;
     private var _clock;
     private var _lastRuntime = 0;
+    private var _lastSelect = null;
 
     function initialize() {
         _clock = new SeClock();
@@ -23,6 +24,15 @@ class SessionDevController {
     function engine() { return _engine; }
 
     function onSelect() {
+        var now = _clock.monotonicMilliseconds();
+        // Ignore duplicate/repeated key events across lifecycle transitions.
+        if (_lastSelect != null && _clock.elapsed(_lastSelect, now) < 750) { return false; }
+        _lastSelect = now;
+        if (_engine.state().equals(SeConstants.STATE_COMPLETED)) {
+            _engine = _engine.nextSession();
+            WatchUi.requestUpdate();
+            return true;
+        }
         if (_engine.state().equals(SeConstants.STATE_IDLE)) { return startSession(); }
         if (_engine.state().equals(SeConstants.STATE_RECORDING)) { return stopSession(); }
         if (_engine.state().equals(SeConstants.STATE_RECOVERED)) {

@@ -14,10 +14,16 @@ class SeTestStore {
     var sessionId = null;
     var state = null;
     var failAppend = false;
+    var failState = false;
+    var journals = {};
 
-    function create(id, startedAt) { sessionId = id; state = SeConstants.STATE_PREPARING; return true; }
+    function create(id, startedAt) {
+        if (journals[id] != null) { return false; }
+        sessionId = id; records = []; journals[id] = records;
+        state = SeConstants.STATE_PREPARING; return true;
+    }
     function append(id, frame) { if (failAppend) { return false; } records.add(frame); return true; }
-    function updateState(id, nextState) { state = nextState; return true; }
+    function updateState(id, nextState) { if (failState) { return false; } state = nextState; return true; }
     function validate(id) {
         var hasFinal = records.size() > 0 && records[records.size() - 1]["frameType"].equals(SeConstants.FRAME_SESSION_FINAL);
         return { "integrity" => hasFinal ? "VALID" : "RECOVERABLE", "lastSequence" => records.size() - 1, "hasFinal" => hasFinal };
@@ -35,6 +41,55 @@ class SeTestStore {
 function seChecksumDetectsChangedPayload(logger) {
     var checksum = new SeChecksum();
     return checksum.calculate("stable") != checksum.calculate("stAble");
+}
+
+(:test)
+function seNextSessionPreservesCompletedJournalAndResetsLiveContext(logger) {
+    var store = new SeTestStore();
+    var clock = new SeTestClock();
+    var first = new SessionEngine(store, clock);
+    if (first.nextSession() != null || !first.prepare() || !first.start()) { return false; }
+    if (first.nextSession() != null) { return false; }
+    clock.monotonic += 2000;
+    first.ingestPosition(2000, 0.0, 0.0, 4.0, 3, true);
+    if (!first.stop()) { return false; }
+    var oldId = first.sessionId();
+    var oldRecords = store.journals[oldId];
+    var count = oldRecords.size();
+    var finalPayload = oldRecords[count - 1]["payload"];
+    clock.monotonic += 60000;
+    if (first.elapsedMilliseconds() != 2000 || !first.stop() || oldRecords.size() != count) { return false; }
+    var next = first.nextSession();
+    if (next == null || !next.state().equals(SeConstants.STATE_IDLE) || next.sessionId() != null) { return false; }
+    if (next.liveState()["distanceMeters"] != 0 || next.liveState()["maximumSpeedMps"] != null) { return false; }
+    if (!next.prepare() || !next.start() || next.sessionId().equals(oldId) || !next.stop()) { return false; }
+    return store.journals[oldId].size() == count && store.journals[oldId][count - 1]["payload"].equals(finalPayload) && first.elapsedMilliseconds() == 2000;
+}
+
+(:test)
+function seRecoveredCompletionFreezesTimeAndPermitsNext(logger) {
+    var store = new SeTestStore();
+    var clock = new SeTestClock();
+    var first = new SessionEngine(store, clock);
+    if (!first.prepare() || !first.start()) { return false; }
+    clock.monotonic += 60000;
+    if (!first.tick()) { return false; }
+    var recovered = new SessionEngine(store, clock);
+    if (!recovered.recoverFirst() || recovered.nextSession() != null) { return false; }
+    if (!recovered.finalizeRecovered()) { return false; }
+    clock.monotonic += 60000;
+    return recovered.elapsedMilliseconds() == 60000 && recovered.nextSession() != null;
+}
+
+(:test)
+function seFailedFinalizationCannotOpenNextSession(logger) {
+    var store = new SeTestStore();
+    var first = new SessionEngine(store, new SeTestClock());
+    if (!first.prepare() || !first.start()) { return false; }
+    var recovered = new SessionEngine(store, new SeTestClock());
+    if (!recovered.recoverFirst()) { return false; }
+    store.failState = true;
+    return !recovered.finalizeRecovered() && recovered.state().equals(SeConstants.STATE_FAILED) && recovered.nextSession() == null;
 }
 
 (:test)

@@ -16,7 +16,12 @@ class SessionDevView extends WatchUi.View {
         dc.drawText(center, 114, Graphics.FONT_XTINY, "MAX " + speedText(live["maximumSpeedMps"]) + " km/h", Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(center, 134, Graphics.FONT_XTINY, "DIST " + distanceText(live["distanceMeters"]) + " km", Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(center, 154, Graphics.FONT_XTINY, "HR " + valueText(live["heartRate"]) + " GPS " + live["gpsStatus"], Graphics.TEXT_JUSTIFY_CENTER);
-        dc.drawText(center, dc.getHeight() - 24, Graphics.FONT_XTINY, "SELECT start/stop/finalize", Graphics.TEXT_JUSTIFY_CENTER);
+        var action = "BACK exit";
+        if (live["state"].equals(SeConstants.STATE_IDLE)) { action = "SELECT start"; }
+        if (live["state"].equals(SeConstants.STATE_RECORDING)) { action = "SELECT stop"; }
+        if (live["state"].equals(SeConstants.STATE_RECOVERED)) { action = "SELECT finalize"; }
+        if (live["state"].equals(SeConstants.STATE_COMPLETED)) { action = "SELECT new / BACK exit"; }
+        dc.drawText(center, dc.getHeight() - 24, Graphics.FONT_XTINY, action, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     function speedText(value) { return value == null ? "--" : (value * 3.6).format("%.1f"); }

@@ -11,6 +11,7 @@ class SessionEngine {
     private var _startedAt = 0;
     private var _wallAnchor = 0;
     private var _elapsedBeforeRecovery = 0;
+    private var _completedElapsed = null;
     private var _lastCheckpointElapsed = 0;
     private var _currentSpeed = null;
     private var _heartRate = null;
@@ -34,9 +35,16 @@ class SessionEngine {
     function state() { return _state; }
     function sessionId() { return _sessionId; }
     function elapsedMilliseconds() {
+        if (_completedElapsed != null) { return _completedElapsed; }
         if (_state.equals(SeConstants.STATE_IDLE)) { return 0; }
         if (_state.equals(SeConstants.STATE_RECOVERED)) { return _elapsedBeforeRecovery; }
         return _elapsedBeforeRecovery + _clock.elapsed(_startedAt, _clock.monotonicMilliseconds());
+    }
+
+    // New live context only; completed durable records remain owned by the store.
+    function nextSession() {
+        if (!_state.equals(SeConstants.STATE_COMPLETED)) { return null; }
+        return new SessionEngine(_store, _clock);
     }
 
     function prepare() {
@@ -125,6 +133,7 @@ class SessionEngine {
         if (_state.equals(SeConstants.STATE_COMPLETED)) { return true; }
         if (!_state.equals(SeConstants.STATE_RECORDING)) { return false; }
         _state = SeConstants.STATE_STOPPING;
+        _completedElapsed = elapsedMilliseconds();
         if (!append(SeConstants.FRAME_SESSION_STOP, "elapsed=" + elapsedMilliseconds())) { return false; }
         if (!checkpoint()) { return false; }
         if (!append(SeConstants.FRAME_SESSION_FINAL, checkpointPayload(elapsedMilliseconds()) + ";completed=" + _clock.epochSeconds())) { return false; }
@@ -153,12 +162,14 @@ class SessionEngine {
 
     function finalizeRecovered() {
         if (!_state.equals(SeConstants.STATE_RECOVERED)) { return false; }
+        _completedElapsed = _elapsedBeforeRecovery;
         _state = SeConstants.STATE_STOPPING;
         if (!append(SeConstants.FRAME_CHECKPOINT, checkpointPayload(_elapsedBeforeRecovery))) { return false; }
         if (!append(SeConstants.FRAME_SESSION_FINAL, checkpointPayload(_elapsedBeforeRecovery) + ";recovered=true;completed=" + _clock.epochSeconds())) { return false; }
         if (!_store.validate(_sessionId)["integrity"].equals("VALID")) { return fail("JOURNAL_CORRUPT"); }
         _state = SeConstants.STATE_COMPLETED;
-        return _store.updateState(_sessionId, _state);
+        if (!_store.updateState(_sessionId, _state)) { return fail("STORAGE_WRITE_FAILED"); }
+        return true;
     }
 
     function append(frameType, payload) {
