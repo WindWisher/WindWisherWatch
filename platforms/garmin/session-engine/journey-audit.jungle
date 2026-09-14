@@ -1,0 +1,3 @@
+project.manifest = journey-audit/manifest.xml
+base.sourcePath = source/SeConstants.mc;source/SeFrame.mc;source/SeChecksum.mc;source/SeReadOnlyAudit.mc;source/SeTransferProducer.mc;journey-export/source/SeExportPages.mc;tests/SessionAuditTests.mc;journey-audit/source
+base.resourcePath = resources/drawables;journey-smoke/resources
