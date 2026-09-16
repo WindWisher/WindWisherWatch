@@ -54,3 +54,7 @@ GARMIN_TARGET_DEVICE=fenix7s ./scripts/build.sh
 ```
 
 Select starts/stops a developer session. A controlled app exit while recording intentionally leaves a recoverable journal; after relaunch, Select explicitly finalizes recovered data. M3 adds developer-only elapsed, current/max speed, distance, HR and GPS-status presentation while retaining SI units in the engine. Developer transition logs never include coordinates or heart-rate values.
+
+The session app also declares `Communications` for its phone-requested, acknowledged
+private-session transfer. It does not make web requests; physical watch-to-phone
+transfer remains a separate verification boundary from simulator tests.

@@ -4,8 +4,13 @@ import Toybox.WatchUi;
 
 class SessionDevApp extends Application.AppBase {
     private var _controller;
+    private var _phoneTransfer;
 
-    function initialize() { AppBase.initialize(); }
+    function initialize() {
+        AppBase.initialize();
+        _phoneTransfer = new SePhoneTransferAdapter(new GarminSessionStore());
+        _phoneTransfer.start();
+    }
 
     function getInitialView() {
         _controller = new SessionDevController();
@@ -13,6 +18,7 @@ class SessionDevApp extends Application.AppBase {
     }
 
     function onStop(state as Lang.Dictionary?) as Void {
+        if (_phoneTransfer != null) { _phoneTransfer.stop(); }
         if (_controller != null) { _controller.shutdown(); }
     }
 }

@@ -19,6 +19,8 @@ const required = [
   "source/SessionPositionSource.mc",
   "source/SessionHealthSource.mc",
   "source/SessionDevApp.mc",
+  "source/SePhoneTransferProtocol.mc",
+  "source/SePhoneTransferAdapter.mc",
   "tests/SessionEngineTests.mc",
   "scripts/build.sh",
   "scripts/test.sh",
@@ -78,15 +80,10 @@ for (const forbidden of [
     );
 
 const manifest = await fs.readFile(path.join(project, "manifest.xml"), "utf8");
-for (const permission of ["Positioning", "Sensor"])
+for (const permission of ["Positioning", "Sensor", "Communications"])
   if (!manifest.includes(`id="${permission}"`))
     throw new Error(`M2 manifest is missing ${permission}`);
-for (const permission of [
-  "Communications",
-  "Background",
-  "SensorHistory",
-  "FitContributor",
-])
+for (const permission of ["Background", "SensorHistory", "FitContributor"])
   if (manifest.includes(`id="${permission}"`))
     throw new Error(`M2 manifest has forbidden permission ${permission}`);
 

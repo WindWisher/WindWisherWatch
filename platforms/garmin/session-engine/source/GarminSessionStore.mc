@@ -121,5 +121,9 @@ class GarminSessionStore {
         return index == null ? {} : index;
     }
 
+    function readChunk(sessionId, chunkNumber) {
+        return Storage.getValue(chunkKey(sessionId, chunkNumber));
+    }
+
     function chunkKey(sessionId, chunkNumber) { return "se." + sessionId + "." + chunkNumber; }
 }

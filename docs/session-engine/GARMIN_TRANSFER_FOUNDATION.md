@@ -1,7 +1,7 @@
 # Garmin journal transfer foundation
 
-Current status: PRIVATE_DIAGNOSTIC_ROUND_TRIP_VERIFIED_TWO_SESSIONS /
-PRODUCTION_TRANSPORT_NOT_IMPLEMENTED.
+Current status: CONNECT_IQ_PHONE_TRANSPORT_IMPLEMENTED_AND_SIMULATOR_TESTED /
+PHYSICAL_ROUND_TRIP_NOT_VERIFIED.
 On 2026-09-13 all six pages were assembled, both canonical sessions were written
 privately on the Mac and reread through the validator: 116 source frames in total.
 Earlier NOT_RUN statements below describe the preceding preparation stages and
@@ -41,11 +41,24 @@ vector/incremental composition, changed bytes, duplicate/reordered/missing frame
 cross-session relabeling, malformed framing, unknown encodings and the exact
 capacity limit. This checks the proposed host protocol, not an actual device export.
 
-The transport-neutral `SeTransferProducer` now reads the audited storage port,
+The transport-neutral `SeTransferProducer` reads the audited storage port,
 retaining one chunk and one pending line. Repeated reads return the same pending
 line until acknowledged. EXHAUSTED means local iteration ended, not remote receipt.
-The caller must supply a stable completed journal. No producer is wired to device
-logs, radio, UI or a writable sink. A private transfer mechanism is still required.
+The caller must supply a stable completed journal.
+
+The session app now exposes a bounded Connect IQ phone protocol through
+`Communications.registerForPhoneAppMessages` and `Communications.transmit`. The
+phone explicitly requests an inventory and then downloads one completed journal
+line by line. Every line remains pending until its exact acknowledgement; duplicate
+requests and acknowledgements replay the same response, out-of-order acknowledgements
+fail closed, and abort never deletes the source journal. Inventory includes at most
+32 validated completed sessions and only the metadata required to let the user decide
+whether to download. The app does not make web requests or upload to a backend.
+
+The transmitted payload remains `garmin-frame-envelope-v1`, not Canonical Session
+v1. The mobile receiver must assemble and fully validate this envelope, then run the
+existing explicit Garmin-to-canonical mapping before offering upload. Directly
+treating transport lines as a user session remains forbidden.
 
 `garmin-canonical.mjs` maps the current scalar payloads through the existing M4
 exporter and validates Canonical Session v1 before returning output. It preserves
@@ -58,12 +71,25 @@ Synthetic tests cover normal/recovered sessions, nullable speed, source preserva
 determinism, malformed semantics and truncated-transfer retry. Real device-to-host
 canonical round-trip remains NOT_RUN; this is not an installed export feature.
 
-Next bounded loop: select and implement a private device-to-host transfer mechanism.
+Next bounded loop: implement the matching mobile request/acknowledgement client and
+route its fully validated envelope through the existing canonical converter.
 Do not emit GPS/HR frames into ordinary diagnostic logs: retention and disclosure
 must be resolved first. Then validate physical round-trip and map Garmin payload
 fields to the existing canonical exporter with explicit quality/provenance.
 Missing fields must not be fabricated. No Canonical Session schema change,
 backend work, sensor acquisition, detector change or automatic recording is included.
+
+## Connect IQ phone transport verification — 2026-09-16
+
+- Main session app builds for fenix7 and fenix7s: PASS.
+- Native simulator: 12/12 logical PASS, including four protocol tests for verified
+  inventory metadata, retry-stable download lines, completion retry and rejection of
+  invalid/out-of-order requests.
+- Full repository check: PASS (180/180 aggregate tests and 61/61 session-engine
+  tests); formatting, lint, contracts and all source guards PASS.
+- Phone-to-watch discovery, physical transfer, Android envelope assembly, canonical
+  conversion and ingestion: NOT_RUN. No firmware was installed and no watch journal
+  was modified or deleted during this implementation loop.
 
 ## Grouped verification — 2026-09-13
 

@@ -115,3 +115,103 @@ function sePrivateExportPagesBoundedAndDeterministic(logger) {
     }
     return total >= 2 && total <= 10 && port.index.size() == 2;
 }
+
+class SePhoneTestPort {
+    var index = {};
+    var chunks = {};
+    var reads = 0;
+    var validations = 0;
+
+    function initialize() {
+        var codec = new SeFrame();
+        var id = "phone-session-1";
+        index[id] = {
+            "state" => "COMPLETED",
+            "startedAt" => 1700000000,
+            "lastChunk" => 0,
+            "lastSequence" => 1
+        };
+        chunks[id + ".0"] = [
+            codec.create(0, "SESSION_START", "started=1700000000"),
+            codec.create(1, "SESSION_FINAL", "elapsed=60000;completed=1700000060")
+        ];
+    }
+
+    function readIndex() { return index; }
+    function readChunk(id, number) { reads += 1; return chunks[id + "." + number]; }
+    function validate(id) {
+        validations += 1;
+        return index[id] == null ? { "integrity" => "CORRUPT" } : { "integrity" => "VALID" };
+    }
+}
+
+function sePhoneRequest(type, requestId) {
+    return {
+        "protocol" => "windwisher.session.transfer",
+        "version" => 1,
+        "type" => type,
+        "requestId" => requestId
+    };
+}
+
+(:test)
+function sePhoneInventoryContainsOnlyVerifiedCompletedMetadata(logger) {
+    var port = new SePhoneTestPort();
+    port.index["recording"] = { "state" => "RECORDING" };
+    var response = new SePhoneTransferProtocol(port).handle(sePhoneRequest("inventory_request", "inventory-1"));
+    var sessions = response["sessions"];
+    if (!response["type"].equals("inventory") || !response["format"].equals("garmin-frame-envelope-v1") || sessions.size() != 1) { return false; }
+    var session = sessions[0];
+    return session["sessionId"].equals("phone-session-1") && session["startedAtEpochSeconds"] == 1700000000 && session["endedAtEpochSeconds"] == 1700000060 && session["durationMilliseconds"] == 60000 && session["frameCount"] == 2 && port.validations == 1;
+}
+
+(:test)
+function sePhoneDownloadIsRetryStableUntilAcknowledged(logger) {
+    var port = new SePhoneTestPort();
+    var protocol = new SePhoneTransferProtocol(port);
+    var request = sePhoneRequest("download_start", "download-1");
+    request["sessionId"] = "phone-session-1";
+    var first = protocol.handle(request);
+    var retry = protocol.handle(request);
+    if (!first["type"].equals("download_line") || first["lineIndex"] != 0 || !first["line"].equals(retry["line"])) { return false; }
+    var ack = sePhoneRequest("download_ack", "download-1");
+    ack["sessionId"] = "phone-session-1";
+    ack["lineIndex"] = 0;
+    var second = protocol.handle(ack);
+    var duplicate = protocol.handle(ack);
+    return second["lineIndex"] == 1 && second["line"].equals(duplicate["line"]) && !first["line"].equals(second["line"]);
+}
+
+(:test)
+function sePhoneDownloadCompletesAndFinalAckCanRetry(logger) {
+    var protocol = new SePhoneTransferProtocol(new SePhoneTestPort());
+    var start = sePhoneRequest("download_start", "download-2");
+    start["sessionId"] = "phone-session-1";
+    var response = protocol.handle(start);
+    if (!response["type"].equals("download_line")) { return false; }
+    for (var line = 0; line < 4; line += 1) {
+        var ack = sePhoneRequest("download_ack", "download-2");
+        ack["sessionId"] = "phone-session-1";
+        ack["lineIndex"] = line;
+        response = protocol.handle(ack);
+    }
+    if (!response["type"].equals("download_complete") || response["lineCount"] != 4) { return false; }
+    var finalRetry = sePhoneRequest("download_ack", "download-2");
+    finalRetry["sessionId"] = "phone-session-1";
+    finalRetry["lineIndex"] = 3;
+    response = protocol.handle(finalRetry);
+    return response["type"].equals("download_complete") && response["lineCount"] == 4;
+}
+
+(:test)
+function sePhoneProtocolRejectsInvalidAndOutOfOrderRequests(logger) {
+    var protocol = new SePhoneTransferProtocol(new SePhoneTestPort());
+    if (!protocol.handle({})["code"].equals("INVALID_REQUEST")) { return false; }
+    var start = sePhoneRequest("download_start", "download-3");
+    start["sessionId"] = "phone-session-1";
+    if (!protocol.handle(start)["type"].equals("download_line")) { return false; }
+    var ack = sePhoneRequest("download_ack", "download-3");
+    ack["sessionId"] = "phone-session-1";
+    ack["lineIndex"] = 2;
+    return protocol.handle(ack)["code"].equals("ACK_OUT_OF_ORDER");
+}
